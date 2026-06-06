@@ -1,4 +1,17 @@
 import { useMemo, useState } from 'react';
+import {
+  FaBrain,
+  FaChartBar,
+  FaChartLine,
+  FaFileAlt,
+  FaHome,
+  FaImage,
+  FaList,
+  FaPencilAlt,
+  FaPlus,
+  FaUserCircle,
+} from 'react-icons/fa';
+import { BsThreeDotsVertical } from 'react-icons/bs';
 
 const starterQuizzes = [
   {
@@ -26,7 +39,7 @@ const starterQuizzes = [
 function Brand() {
   return (
     <strong className="brand">
-      SMARTIQ <span className="brand-mark">B</span>
+      SMARTQ <FaBrain className="brand-icon" aria-hidden="true" />
     </strong>
   );
 }
@@ -42,8 +55,8 @@ function HomePage({ onNavigate, onPlay }) {
   return (
     <section className="page blue-page home-page">
       <nav className="top-nav">
-        <button className="nav-button active" type="button" onClick={() => onNavigate('home')}>Beranda</button>
-        <button className="nav-button" type="button" onClick={() => onNavigate('login')}>Buat Kuis</button>
+        <button className="nav-button active" type="button" onClick={() => onNavigate('home')}><FaHome /> Beranda</button>
+        <button className="nav-button" type="button" onClick={() => onNavigate('login')}><FaPencilAlt /> Buat Kuis</button>
       </nav>
 
       <div className="home-content">
@@ -120,24 +133,24 @@ function DashboardPage({ quizzes, activePanel, setActivePanel, onCreate, onEdit 
         <Brand />
         <div className="dashboard-actions">
           <button className="create-button" type="button" onClick={onCreate}>Buat Kuis</button>
-          <span className="profile-icon" />
+          <FaUserCircle className="profile-icon" aria-label="Profil pengajar" />
         </div>
       </header>
 
       <div className="dashboard-body">
         <aside className="sidebar">
-          <button className={activePanel === 'beranda' ? 'active' : ''} type="button" onClick={() => setActivePanel('beranda')}>Beranda</button>
-          <button className={activePanel === 'pustaka' ? 'active' : ''} type="button" onClick={() => setActivePanel('pustaka')}>Pustaka</button>
-          <button className={activePanel === 'laporan' ? 'active' : ''} type="button" onClick={() => setActivePanel('laporan')}>Laporan</button>
+          <button className={activePanel === 'beranda' ? 'active' : ''} type="button" onClick={() => setActivePanel('beranda')}><FaHome /> Beranda</button>
+          <button className={activePanel === 'pustaka' ? 'active' : ''} type="button" onClick={() => setActivePanel('pustaka')}><FaList /> Pustaka</button>
+          <button className={activePanel === 'laporan' ? 'active' : ''} type="button" onClick={() => setActivePanel('laporan')}><FaChartLine /> Laporan</button>
         </aside>
 
         <main className="dashboard-content">
           {activePanel === 'beranda' && (
             <>
               <div className="stat-grid">
-                <article><h2>Total soal</h2><span className="icon-card" /><strong>{totalQuestions || 5} Soal</strong></article>
-                <article><h2>Dibuat Hari Ini</h2><span className="icon-pencil" /><strong>{finishedReports || 1} Soal</strong></article>
-                <article><h2>Laporan Selesai</h2><span className="icon-chart" /><strong>{finishedReports || 1} Laporan</strong></article>
+                <article><h2>Total soal</h2><FaFileAlt className="stat-icon" /><strong>{totalQuestions || 5} Soal</strong></article>
+                <article><h2>Dibuat Hari Ini</h2><FaPencilAlt className="stat-icon" /><strong>{finishedReports || 1} Soal</strong></article>
+                <article><h2>Laporan Selesai</h2><FaChartBar className="stat-icon" /><strong>{finishedReports || 1} Laporan</strong></article>
               </div>
               <article className="activity-card">
                 <h2>Aktivitas Terbaru</h2>
@@ -154,7 +167,7 @@ function DashboardPage({ quizzes, activePanel, setActivePanel, onCreate, onEdit 
                 {filteredQuizzes.map((quiz) => (
                   <div className="quiz-row" key={quiz.id}>
                     <span>{quiz.title}</span>
-                    <button className="dots-button" type="button" onClick={() => onEdit(quiz.id)}>...</button>
+                    <button className="dots-button" type="button" onClick={() => onEdit(quiz.id)}><BsThreeDotsVertical /></button>
                   </div>
                 ))}
               </div>
@@ -252,12 +265,12 @@ function EditorPage({ quiz, onNavigate, onSaveQuestion }) {
         <div className="editor-body">
           <aside className="question-sidebar">
             <button className="question-tab" type="button">Soal {quiz.questions.length + 1}</button>
-            <button className="add-question-button" type="button">Tambahkan</button>
+            <button className="add-question-button" type="button"><FaPlus /> Tambahkan</button>
           </aside>
 
           <section className="question-canvas">
             <textarea value={question} onChange={(event) => setQuestion(event.target.value)} placeholder="Mulai tulis soal" required />
-            <button className="image-button" type="button">+ Tambah Gambar</button>
+            <button className="image-button" type="button"><FaImage /> Tambah Gambar</button>
 
             <div className="answer-grid">
               {['A', 'B', 'C', 'D'].map((option, index) => (

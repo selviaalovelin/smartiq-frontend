@@ -1,6 +1,6 @@
-# SMARTIQ Quiz App
+# SMARTQ Quiz App
 
-SMARTIQ adalah rancangan aplikasi kuis interaktif berbasis web. Aplikasi ini menyediakan tampilan untuk peserta yang ingin masuk ke kuis menggunakan PIN dan tampilan pengajar untuk membuat serta mengelola soal kuis.
+SMARTQ adalah rancangan aplikasi kuis interaktif berbasis web. Aplikasi ini menyediakan tampilan untuk peserta yang ingin masuk ke kuis menggunakan PIN dan tampilan pengajar untuk membuat serta mengelola soal kuis.
 
 ## Fitur Utama
 
