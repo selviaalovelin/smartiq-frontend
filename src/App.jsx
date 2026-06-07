@@ -44,11 +44,30 @@ function Brand() {
   );
 }
 
+const isEmailValid = (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+
+function FieldError({ message }) {
+  return message ? <p className="field-error">{message}</p> : null;
+}
+
 function HomePage({ onNavigate, onPlay }) {
   const [pin, setPin] = useState('');
+  const [submitted, setSubmitted] = useState(false);
+
+  const pinError = submitted
+    ? !pin.trim()
+      ? 'PIN soal wajib diisi.'
+      : pin.length < 4
+        ? 'PIN minimal 4 digit.'
+        : ''
+    : '';
 
   const handlePin = (event) => {
     event.preventDefault();
+    setSubmitted(true);
+    if (!pin.trim() || pin.length < 4) {
+      return;
+    }
     onPlay();
   };
 
@@ -61,15 +80,22 @@ function HomePage({ onNavigate, onPlay }) {
 
       <div className="home-content">
         <Brand />
-        <form className="pin-card" onSubmit={handlePin}>
+        <form className="pin-card" onSubmit={handlePin} noValidate>
           <input
+            className={pinError ? 'input-error' : ''}
             value={pin}
-            onChange={(event) => setPin(event.target.value.replace(/\D/g, '').slice(0, 6))}
+            onChange={(event) => {
+              setPin(event.target.value.replace(/\D/g, '').slice(0, 6));
+              if (submitted) {
+                setSubmitted(false);
+              }
+            }}
             placeholder="Pin Soal"
             inputMode="numeric"
           />
-          <button type="submit" disabled={pin.length < 4}>Masuk</button>
-          <p>{pin.length >= 4 ? 'PIN siap digunakan' : ''}</p>
+          <FieldError message={pinError} />
+          <button className={pin.length < 4 ? 'is-disabled' : ''} type="submit">Masuk</button>
+          <p>{pin.length >= 4 && !pinError ? 'PIN siap digunakan' : ''}</p>
         </form>
       </div>
     </section>
@@ -78,29 +104,87 @@ function HomePage({ onNavigate, onPlay }) {
 
 function AuthPage({ mode, onNavigate }) {
   const isRegister = mode === 'register';
+  const [form, setForm] = useState({ email: '', password: '', confirmPassword: '' });
+  const [submitted, setSubmitted] = useState(false);
+  const [touched, setTouched] = useState({});
+
+  const errors = {
+    email: !form.email.trim()
+      ? 'Email wajib diisi.'
+      : !isEmailValid(form.email)
+        ? 'Format email belum benar.'
+        : '',
+    password: !form.password
+      ? 'Kata sandi wajib diisi.'
+      : isRegister && form.password.length < 8
+        ? 'Kata sandi minimal 8 karakter.'
+        : '',
+    confirmPassword: isRegister
+      ? !form.confirmPassword
+        ? 'Konfirmasi kata sandi wajib diisi.'
+        : form.confirmPassword !== form.password
+          ? 'Konfirmasi kata sandi harus sama.'
+          : ''
+      : '',
+  };
+
+  const showError = (field) => (submitted || touched[field]) ? errors[field] : '';
+  const isFormValid = !errors.email && !errors.password && !errors.confirmPassword;
+
+  const updateField = (field, value) => {
+    setForm((current) => ({ ...current, [field]: value }));
+  };
 
   const handleSubmit = (event) => {
     event.preventDefault();
+    setSubmitted(true);
+    if (!isFormValid) {
+      return;
+    }
     onNavigate('dashboard');
   };
 
   return (
     <section className="page blue-page auth-page">
-      <form className="auth-card" onSubmit={handleSubmit}>
+      <form className="auth-card" onSubmit={handleSubmit} noValidate>
         <label>Email:</label>
-        <input type="email" placeholder="Masukkan Email Anda" required />
+        <input
+          className={showError('email') ? 'input-error' : ''}
+          type="email"
+          value={form.email}
+          onBlur={() => setTouched((current) => ({ ...current, email: true }))}
+          onChange={(event) => updateField('email', event.target.value)}
+          placeholder="Masukkan Email Anda"
+        />
+        <FieldError message={showError('email')} />
 
         <label>Kata Sandi:</label>
-        <input type="password" placeholder="Masukkan Kata Sandi Anda" minLength={isRegister ? 8 : undefined} required />
+        <input
+          className={showError('password') ? 'input-error' : ''}
+          type="password"
+          value={form.password}
+          onBlur={() => setTouched((current) => ({ ...current, password: true }))}
+          onChange={(event) => updateField('password', event.target.value)}
+          placeholder="Masukkan Kata Sandi Anda"
+        />
+        <FieldError message={showError('password')} />
 
         {isRegister && (
           <>
             <label>Konfirmasi Kata Sandi:</label>
-            <input type="password" placeholder="Konfirmasi Kata Sandi Anda" minLength="8" required />
+            <input
+              className={showError('confirmPassword') ? 'input-error' : ''}
+              type="password"
+              value={form.confirmPassword}
+              onBlur={() => setTouched((current) => ({ ...current, confirmPassword: true }))}
+              onChange={(event) => updateField('confirmPassword', event.target.value)}
+              placeholder="Konfirmasi Kata Sandi Anda"
+            />
+            <FieldError message={showError('confirmPassword')} />
           </>
         )}
 
-        <button className="primary-button" type="submit">{isRegister ? 'Daftar' : 'Masuk'}</button>
+        <button className={`primary-button ${!isFormValid ? 'is-disabled' : ''}`} type="submit">{isRegister ? 'Daftar' : 'Masuk'}</button>
 
         <p>
           {isRegister ? 'Sudah punya akun?' : 'Belum memiliki akun?'}
@@ -195,28 +279,39 @@ function CreateQuizModal({ onClose, onSubmit }) {
   const [category, setCategory] = useState('');
   const [newCategory, setNewCategory] = useState('');
   const [title, setTitle] = useState('');
-  const canSubmit = category || newCategory.trim() || title.trim();
+  const [submitted, setSubmitted] = useState(false);
+  const hasCategory = Boolean(category || newCategory.trim());
+  const hasTitle = Boolean(title.trim());
+  const canSubmit = hasCategory && hasTitle;
+  const categoryError = submitted && !hasCategory ? 'Kategori kuis wajib dipilih atau ditambahkan.' : '';
+  const titleError = submitted && !hasTitle ? 'Judul kuis wajib diisi.' : '';
 
   const handleSubmit = (event) => {
     event.preventDefault();
+    setSubmitted(true);
+    if (!canSubmit) {
+      return;
+    }
     onSubmit({
       title: title.trim(),
-      category: newCategory.trim() || category || 'Layanan Web',
+      category: newCategory.trim() || category,
     });
   };
 
   return (
     <div className="modal">
-      <form className="modal-card" onSubmit={handleSubmit}>
-        <select value={category} onChange={(event) => setCategory(event.target.value)}>
+      <form className="modal-card" onSubmit={handleSubmit} noValidate>
+        <select className={categoryError ? 'input-error' : ''} value={category} onChange={(event) => setCategory(event.target.value)}>
           <option value="">Pilih Kategori Kuis</option>
           <option>Layanan Web</option>
           <option>Pemrograman Internet</option>
           <option>Sistem Operasi</option>
         </select>
-        <input value={newCategory} onChange={(event) => setNewCategory(event.target.value)} placeholder="Tambah Kategori" />
-        <input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Judul quiz, contoh: Soal Quiz 1" />
-        <button type="submit" disabled={!canSubmit}>Lanjutkan membuat soal</button>
+        <input className={categoryError ? 'input-error' : ''} value={newCategory} onChange={(event) => setNewCategory(event.target.value)} placeholder="Tambah Kategori" />
+        <FieldError message={categoryError} />
+        <input className={titleError ? 'input-error' : ''} value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Judul quiz, contoh: Soal Quiz 1" />
+        <FieldError message={titleError} />
+        <button className={!canSubmit ? 'is-disabled' : ''} type="submit">Lanjutkan membuat soal</button>
         <button className="modal-close" type="button" onClick={onClose}>Batalkan</button>
       </form>
     </div>
@@ -228,8 +323,17 @@ function EditorPage({ quiz, onNavigate, onSaveQuestion }) {
   const [question, setQuestion] = useState('');
   const [answers, setAnswers] = useState(['', '', '', '']);
   const [correct, setCorrect] = useState('A');
+  const [submitted, setSubmitted] = useState(false);
+  const [touched, setTouched] = useState({});
 
-  const canSave = question.trim() && answers[0].trim() && answers[1].trim();
+  const titleError = (submitted || touched.title) && !title.trim() ? 'Judul kuis wajib diisi.' : '';
+  const questionError = (submitted || touched.question) && !question.trim() ? 'Pertanyaan wajib diisi.' : '';
+  const answerErrors = answers.map((answer, index) => (
+    (submitted || touched[`answer-${index}`]) && !answer.trim()
+      ? `Jawaban ${['A', 'B', 'C', 'D'][index]} wajib diisi.`
+      : ''
+  ));
+  const canSave = title.trim() && question.trim() && answers.every((answer) => answer.trim());
 
   const handleAnswer = (index, value) => {
     const nextAnswers = [...answers];
@@ -239,11 +343,15 @@ function EditorPage({ quiz, onNavigate, onSaveQuestion }) {
 
   const handleSubmit = (event) => {
     event.preventDefault();
+    setSubmitted(true);
+    if (!canSave) {
+      return;
+    }
     onSaveQuestion(quiz.id, {
-      title,
+      title: title.trim(),
       question: {
         text: question.trim(),
-        answers,
+        answers: answers.map((answer) => answer.trim()),
         correct,
       },
     });
@@ -254,12 +362,21 @@ function EditorPage({ quiz, onNavigate, onSaveQuestion }) {
 
   return (
     <section className="page editor-page classroom-page">
-      <form className="editor-form" onSubmit={handleSubmit}>
+      <form className="editor-form" onSubmit={handleSubmit} noValidate>
         <header className="editor-header">
           <Brand />
-          <input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Masukan Judul disini" />
+          <div className="editor-title-field">
+            <input
+              className={titleError ? 'input-error' : ''}
+              value={title}
+              onBlur={() => setTouched((current) => ({ ...current, title: true }))}
+              onChange={(event) => setTitle(event.target.value)}
+              placeholder="Masukan Judul disini"
+            />
+            <FieldError message={titleError} />
+          </div>
           <button className="secondary-button" type="button" onClick={() => onNavigate('dashboard')}>Batal</button>
-          <button className="save-button" type="submit" disabled={!canSave}>Simpan</button>
+          <button className={`save-button ${!canSave ? 'is-disabled' : ''}`} type="submit">Simpan</button>
         </header>
 
         <div className="editor-body">
@@ -269,14 +386,28 @@ function EditorPage({ quiz, onNavigate, onSaveQuestion }) {
           </aside>
 
           <section className="question-canvas">
-            <textarea value={question} onChange={(event) => setQuestion(event.target.value)} placeholder="Mulai tulis soal" required />
+            <textarea
+              className={questionError ? 'input-error' : ''}
+              value={question}
+              onBlur={() => setTouched((current) => ({ ...current, question: true }))}
+              onChange={(event) => setQuestion(event.target.value)}
+              placeholder="Mulai tulis soal"
+            />
+            <FieldError message={questionError} />
             <button className="image-button" type="button"><FaImage /> Tambah Gambar</button>
 
             <div className="answer-grid">
               {['A', 'B', 'C', 'D'].map((option, index) => (
                 <label key={option}>
                   <span><input checked={correct === option} onChange={() => setCorrect(option)} type="radio" name="correct" /> {option}</span>
-                  <input value={answers[index]} onChange={(event) => handleAnswer(index, event.target.value)} placeholder="Tambahkan jawaban" required={index < 2} />
+                  <input
+                    className={answerErrors[index] ? 'input-error' : ''}
+                    value={answers[index]}
+                    onBlur={() => setTouched((current) => ({ ...current, [`answer-${index}`]: true }))}
+                    onChange={(event) => handleAnswer(index, event.target.value)}
+                    placeholder="Tambahkan jawaban"
+                  />
+                  <FieldError message={answerErrors[index]} />
                 </label>
               ))}
             </div>
