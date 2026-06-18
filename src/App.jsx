@@ -1,14 +1,17 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   FaBrain,
   FaChartBar,
   FaChartLine,
+  FaArrowRight,
   FaFileAlt,
+  FaCog,
   FaHome,
   FaImage,
   FaList,
   FaPencilAlt,
   FaPlus,
+  FaTimes,
   FaUserCircle,
 } from 'react-icons/fa';
 import { BsThreeDotsVertical } from 'react-icons/bs';
@@ -50,8 +53,8 @@ function FieldError({ message }) {
   return message ? <p className="field-error">{message}</p> : null;
 }
 
-function HomePage({ onNavigate, onPlay }) {
-  const [pin, setPin] = useState('');
+function HomePage({ onNavigate, onJoin }) {
+  const [pin, setPin] = useState('109276');
   const [submitted, setSubmitted] = useState(false);
 
   const pinError = submitted
@@ -68,7 +71,7 @@ function HomePage({ onNavigate, onPlay }) {
     if (!pin.trim() || pin.length < 4) {
       return;
     }
-    onPlay();
+    onJoin(pin);
   };
 
   return (
@@ -95,7 +98,49 @@ function HomePage({ onNavigate, onPlay }) {
           />
           <FieldError message={pinError} />
           <button className={pin.length < 4 ? 'is-disabled' : ''} type="submit">Masuk</button>
-          <p>{pin.length >= 4 && !pinError ? 'PIN siap digunakan' : ''}</p>
+        </form>
+      </div>
+    </section>
+  );
+}
+
+function ParticipantNamePage({ onStart }) {
+  const [nickname, setNickname] = useState('');
+  const [submitted, setSubmitted] = useState(false);
+
+  const nameError = submitted
+    ? !nickname.trim()
+      ? 'Nama panggilan wajib diisi.'
+      : ''
+    : '';
+
+  const handleJoin = (event) => {
+    event.preventDefault();
+    setSubmitted(true);
+    if (!nickname.trim()) {
+      return;
+    }
+    onStart(nickname.trim());
+  };
+
+  return (
+    <section className="page participant-login classroom-scene">
+      <div className="participant-content">
+        <Brand />
+        <form className="participant-card" onSubmit={handleJoin} noValidate>
+          <input
+            className={nameError ? 'input-error' : ''}
+            value={nickname}
+            onChange={(event) => {
+              setNickname(event.target.value);
+              if (submitted) {
+                setSubmitted(false);
+              }
+            }}
+            placeholder="Nama panggilan"
+          />
+          <FieldError message={nameError} />
+          <button className={!nickname.trim() ? 'is-disabled' : ''} type="submit">Oke, Mulai!</button>
         </form>
       </div>
     </section>
@@ -232,9 +277,21 @@ function DashboardPage({ quizzes, activePanel, setActivePanel, onCreate, onEdit 
           {activePanel === 'beranda' && (
             <>
               <div className="stat-grid">
-                <article><h2>Total soal</h2><FaFileAlt className="stat-icon" /><strong>{totalQuestions || 5} Soal</strong></article>
-                <article><h2>Dibuat Hari Ini</h2><FaPencilAlt className="stat-icon" /><strong>{finishedReports || 1} Soal</strong></article>
-                <article><h2>Laporan Selesai</h2><FaChartBar className="stat-icon" /><strong>{finishedReports || 1} Laporan</strong></article>
+                <button className="stat-card" type="button" onClick={() => setActivePanel('pustaka')}>
+                  <h2>Total soal</h2>
+                  <FaFileAlt className="stat-icon" />
+                  <strong>{totalQuestions || 5} Soal</strong>
+                </button>
+                <button className="stat-card" type="button" onClick={() => setActivePanel('pustaka')}>
+                  <h2>Dibuat Hari Ini</h2>
+                  <FaPencilAlt className="stat-icon" />
+                  <strong>{finishedReports || 1} Soal</strong>
+                </button>
+                <button className="stat-card" type="button" onClick={() => setActivePanel('laporan')}>
+                  <h2>Laporan Selesai</h2>
+                  <FaChartBar className="stat-icon" />
+                  <strong>{finishedReports || 1} Laporan</strong>
+                </button>
               </div>
               <article className="activity-card">
                 <h2>Aktivitas Terbaru</h2>
@@ -275,16 +332,20 @@ function DashboardPage({ quizzes, activePanel, setActivePanel, onCreate, onEdit 
   );
 }
 
+const createEmptyQuestion = () => ({
+  text: '',
+  answers: ['', '', '', ''],
+  correct: 'A',
+  timeLimit: 10,
+});
+
 function CreateQuizModal({ onClose, onSubmit }) {
   const [category, setCategory] = useState('');
   const [newCategory, setNewCategory] = useState('');
-  const [title, setTitle] = useState('');
   const [submitted, setSubmitted] = useState(false);
   const hasCategory = Boolean(category || newCategory.trim());
-  const hasTitle = Boolean(title.trim());
-  const canSubmit = hasCategory && hasTitle;
+  const canSubmit = hasCategory;
   const categoryError = submitted && !hasCategory ? 'Kategori kuis wajib dipilih atau ditambahkan.' : '';
-  const titleError = submitted && !hasTitle ? 'Judul kuis wajib diisi.' : '';
 
   const handleSubmit = (event) => {
     event.preventDefault();
@@ -293,7 +354,6 @@ function CreateQuizModal({ onClose, onSubmit }) {
       return;
     }
     onSubmit({
-      title: title.trim(),
       category: newCategory.trim() || category,
     });
   };
@@ -307,38 +367,56 @@ function CreateQuizModal({ onClose, onSubmit }) {
           <option>Pemrograman Internet</option>
           <option>Sistem Operasi</option>
         </select>
-        <input className={categoryError ? 'input-error' : ''} value={newCategory} onChange={(event) => setNewCategory(event.target.value)} placeholder="Tambah Kategori" />
+        <div className="category-field">
+          <input className={categoryError ? 'input-error' : ''} value={newCategory} onChange={(event) => setNewCategory(event.target.value)} placeholder="Tambah Kategori" />
+          <button className="add-category-button" type="button" onClick={() => setCategory('')} aria-label="Tambah kategori"><FaPlus /></button>
+        </div>
         <FieldError message={categoryError} />
-        <input className={titleError ? 'input-error' : ''} value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Judul quiz, contoh: Soal Quiz 1" />
-        <FieldError message={titleError} />
-        <button className={!canSubmit ? 'is-disabled' : ''} type="submit">Lanjutkan membuat soal</button>
+        <button className={!canSubmit ? 'is-disabled' : ''} type="submit">Lanjutkan membuat soal <FaArrowRight /></button>
         <button className="modal-close" type="button" onClick={onClose}>Batalkan</button>
       </form>
     </div>
   );
 }
 
-function EditorPage({ quiz, onNavigate, onSaveQuestion }) {
+function EditorPage({ quiz, onNavigate, onSaveQuiz }) {
   const [title, setTitle] = useState(quiz.title);
-  const [question, setQuestion] = useState('');
-  const [answers, setAnswers] = useState(['', '', '', '']);
-  const [correct, setCorrect] = useState('A');
+  const [questions, setQuestions] = useState(() => (
+    quiz.questions.length ? quiz.questions.map((question) => ({ timeLimit: 10, ...question })) : [createEmptyQuestion()]
+  ));
+  const [activeQuestionIndex, setActiveQuestionIndex] = useState(0);
+  const [showProperties, setShowProperties] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [touched, setTouched] = useState({});
+  const activeQuestion = questions[activeQuestionIndex] || questions[0];
 
   const titleError = (submitted || touched.title) && !title.trim() ? 'Judul kuis wajib diisi.' : '';
-  const questionError = (submitted || touched.question) && !question.trim() ? 'Pertanyaan wajib diisi.' : '';
-  const answerErrors = answers.map((answer, index) => (
-    (submitted || touched[`answer-${index}`]) && !answer.trim()
+  const questionError = (submitted || touched[`question-${activeQuestionIndex}`]) && !activeQuestion.text.trim() ? 'Pertanyaan wajib diisi.' : '';
+  const answerErrors = activeQuestion.answers.map((answer, index) => (
+    (submitted || touched[`answer-${activeQuestionIndex}-${index}`]) && !answer.trim()
       ? `Jawaban ${['A', 'B', 'C', 'D'][index]} wajib diisi.`
       : ''
   ));
-  const canSave = title.trim() && question.trim() && answers.every((answer) => answer.trim());
+  const areQuestionsValid = questions.every((item) => item.text.trim() && item.answers.every((answer) => answer.trim()));
+  const canSave = title.trim() && areQuestionsValid;
 
-  const handleAnswer = (index, value) => {
-    const nextAnswers = [...answers];
-    nextAnswers[index] = value;
-    setAnswers(nextAnswers);
+  const updateActiveQuestion = (changes) => {
+    setQuestions((current) => current.map((item, index) => (
+      index === activeQuestionIndex ? { ...item, ...changes } : item
+    )));
+  };
+
+  const handleAnswer = (answerIndex, value) => {
+    updateActiveQuestion({
+      answers: activeQuestion.answers.map((answer, index) => (index === answerIndex ? value : answer)),
+    });
+  };
+
+  const handleAddQuestion = () => {
+    setQuestions((current) => [...current, createEmptyQuestion()]);
+    setActiveQuestionIndex(questions.length);
+    setTouched({});
+    setSubmitted(false);
   };
 
   const handleSubmit = (event) => {
@@ -347,17 +425,16 @@ function EditorPage({ quiz, onNavigate, onSaveQuestion }) {
     if (!canSave) {
       return;
     }
-    onSaveQuestion(quiz.id, {
+    onSaveQuiz(quiz.id, {
       title: title.trim(),
-      question: {
-        text: question.trim(),
-        answers: answers.map((answer) => answer.trim()),
-        correct,
-      },
+      questions: questions.map((item) => ({
+        text: item.text.trim(),
+        answers: item.answers.map((answer) => answer.trim()),
+        correct: item.correct,
+        timeLimit: Number(item.timeLimit) || 10,
+      })),
     });
-    setQuestion('');
-    setAnswers(['', '', '', '']);
-    setCorrect('A');
+    onNavigate('dashboard');
   };
 
   return (
@@ -373,6 +450,7 @@ function EditorPage({ quiz, onNavigate, onSaveQuestion }) {
               onChange={(event) => setTitle(event.target.value)}
               placeholder="Masukan Judul disini"
             />
+            <button className="editor-gear" type="button" onClick={() => setShowProperties(true)} aria-label="Properti soal"><FaCog /></button>
             <FieldError message={titleError} />
           </div>
           <button className="secondary-button" type="button" onClick={() => onNavigate('dashboard')}>Batal</button>
@@ -381,29 +459,42 @@ function EditorPage({ quiz, onNavigate, onSaveQuestion }) {
 
         <div className="editor-body">
           <aside className="question-sidebar">
-            <button className="question-tab" type="button">Soal {quiz.questions.length + 1}</button>
-            <button className="add-question-button" type="button"><FaPlus /> Tambahkan</button>
+            {questions.map((item, index) => (
+              <button
+                className={`question-tab ${activeQuestionIndex === index ? 'active' : ''}`}
+                key={`question-${index + 1}`}
+                type="button"
+                onClick={() => {
+                  setActiveQuestionIndex(index);
+                  setTouched({});
+                  setSubmitted(false);
+                }}
+              >
+                Soal {index + 1}
+              </button>
+            ))}
+            <button className="add-question-button" type="button" onClick={handleAddQuestion}>Tambahkan</button>
           </aside>
 
           <section className="question-canvas">
             <textarea
               className={questionError ? 'input-error' : ''}
-              value={question}
-              onBlur={() => setTouched((current) => ({ ...current, question: true }))}
-              onChange={(event) => setQuestion(event.target.value)}
+              value={activeQuestion.text}
+              onBlur={() => setTouched((current) => ({ ...current, [`question-${activeQuestionIndex}`]: true }))}
+              onChange={(event) => updateActiveQuestion({ text: event.target.value })}
               placeholder="Mulai tulis soal"
             />
             <FieldError message={questionError} />
-            <button className="image-button" type="button"><FaImage /> Tambah Gambar</button>
+            <button className="image-button" type="button"><FaPlus /> Tambah Gambar</button>
 
             <div className="answer-grid">
               {['A', 'B', 'C', 'D'].map((option, index) => (
                 <label key={option}>
-                  <span><input checked={correct === option} onChange={() => setCorrect(option)} type="radio" name="correct" /> {option}</span>
+                  <span><input checked={activeQuestion.correct === option} onChange={() => updateActiveQuestion({ correct: option })} type="radio" name={`correct-${activeQuestionIndex}`} /> {option}</span>
                   <input
                     className={answerErrors[index] ? 'input-error' : ''}
-                    value={answers[index]}
-                    onBlur={() => setTouched((current) => ({ ...current, [`answer-${index}`]: true }))}
+                    value={activeQuestion.answers[index]}
+                    onBlur={() => setTouched((current) => ({ ...current, [`answer-${activeQuestionIndex}-${index}`]: true }))}
                     onChange={(event) => handleAnswer(index, event.target.value)}
                     placeholder="Tambahkan jawaban"
                   />
@@ -412,26 +503,124 @@ function EditorPage({ quiz, onNavigate, onSaveQuestion }) {
               ))}
             </div>
           </section>
+
+          {showProperties && (
+            <aside className="properties-panel">
+              <button className="properties-close" type="button" onClick={() => setShowProperties(false)} aria-label="Tutup properti"><FaTimes /></button>
+              <h2>Properti soal</h2>
+              <label>Batas waktu</label>
+              <select value={activeQuestion.timeLimit} onChange={(event) => updateActiveQuestion({ timeLimit: Number(event.target.value) })}>
+                <option value="10">10 detik</option>
+                <option value="15">15 detik</option>
+                <option value="20">20 detik</option>
+                <option value="30">30 detik</option>
+              </select>
+            </aside>
+          )}
         </div>
       </form>
     </section>
   );
 }
 
-function PlayPage({ quiz, onNavigate }) {
+function PlayPage({ quiz, onNavigate, participantName }) {
   const fallback = starterQuizzes[0].questions[0];
-  const question = quiz?.questions[0] || fallback;
+  const quizQuestions = quiz?.questions.length ? quiz.questions : [fallback];
+  const [activeQuestionIndex, setActiveQuestionIndex] = useState(0);
+  const question = quizQuestions[activeQuestionIndex] || fallback;
+  const [showIntro, setShowIntro] = useState(true);
+  const [seconds, setSeconds] = useState(question.timeLimit || 10);
+  const [selectedAnswer, setSelectedAnswer] = useState('');
+  const [timeUp, setTimeUp] = useState(false);
+
+  useEffect(() => {
+    setShowIntro(true);
+    setSeconds(question.timeLimit || 10);
+    setSelectedAnswer('');
+    setTimeUp(false);
+    const introTimer = window.setTimeout(() => {
+      setShowIntro(false);
+    }, 1400);
+
+    return () => window.clearTimeout(introTimer);
+  }, [activeQuestionIndex, question.text, question.timeLimit]);
+
+  useEffect(() => {
+    if (showIntro || selectedAnswer || timeUp) {
+      return undefined;
+    }
+
+    const timer = window.setInterval(() => {
+      setSeconds((current) => {
+        if (current <= 1) {
+          setTimeUp(true);
+          return 1;
+        }
+
+        return current - 1;
+      });
+    }, 1000);
+
+    return () => window.clearInterval(timer);
+  }, [showIntro, selectedAnswer, timeUp]);
+
+  const isCorrect = selectedAnswer === question.correct;
+  const goToNextQuestion = () => {
+    if (activeQuestionIndex < quizQuestions.length - 1) {
+      setActiveQuestionIndex((current) => current + 1);
+      return;
+    }
+
+    onNavigate('result');
+  };
+
+  const handleSelectAnswer = (option) => {
+    setSelectedAnswer(option);
+    window.setTimeout(goToNextQuestion, 1200);
+  };
+
+  useEffect(() => {
+    if (!timeUp || selectedAnswer) {
+      return undefined;
+    }
+
+    const nextTimer = window.setTimeout(goToNextQuestion, 1000);
+    return () => window.clearTimeout(nextTimer);
+  }, [timeUp, selectedAnswer]);
 
   return (
-    <section className="page play-page classroom-page">
+    <section className="page play-page classroom-scene">
       <button className="result-shortcut" type="button" onClick={() => onNavigate('result')}>Lihat Hasil</button>
-      <div className="countdown">6</div>
-      <article className="play-question">{question.text}</article>
-      <div className="play-options">
-        {question.answers.map((answer, index) => (
-          <button type="button" key={answer}>{['A', 'B', 'C', 'D'][index]}. {answer}</button>
-        ))}
-      </div>
+      {showIntro ? (
+        <div className="question-intro">Pertanyaan {activeQuestionIndex + 1}...</div>
+      ) : (
+        <>
+          <div className="countdown">{seconds}</div>
+          <article className="play-question">{question.text}</article>
+          <div className="play-options">
+            {question.answers.map((answer, index) => (
+              <button
+                className={[
+                  selectedAnswer === ['A', 'B', 'C', 'D'][index] ? 'is-selected' : '',
+                  selectedAnswer === ['A', 'B', 'C', 'D'][index] && isCorrect ? 'is-correct' : '',
+                  selectedAnswer === ['A', 'B', 'C', 'D'][index] && !isCorrect ? 'is-wrong' : '',
+                ].filter(Boolean).join(' ')}
+                disabled={Boolean(selectedAnswer) || timeUp}
+                type="button"
+                key={`${['A', 'B', 'C', 'D'][index]}-${answer}`}
+                onClick={() => handleSelectAnswer(['A', 'B', 'C', 'D'][index])}
+              >
+                <span>{['A', 'B', 'C', 'D'][index]}</span>
+                {answer}
+              </button>
+            ))}
+          </div>
+          <p className="answer-feedback">
+            {selectedAnswer && `${participantName || 'Peserta'} memilih jawaban ${selectedAnswer}. ${isCorrect ? 'Benar!' : 'Belum tepat.'}`}
+            {!selectedAnswer && timeUp && 'Waktu habis. Jawaban tidak terkirim.'}
+          </p>
+        </>
+      )}
     </section>
   );
 }
@@ -455,6 +644,8 @@ export default function App() {
   const [activePanel, setActivePanel] = useState('beranda');
   const [activeQuizId, setActiveQuizId] = useState(starterQuizzes[0].id);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [participantPin, setParticipantPin] = useState('');
+  const [participantName, setParticipantName] = useState('');
 
   const activeQuiz = quizzes.find((quiz) => quiz.id === activeQuizId) || quizzes[0];
 
@@ -477,7 +668,17 @@ export default function App() {
     setPage('editor');
   };
 
-  const handleSaveQuestion = (quizId, payload) => {
+  const handleJoinQuiz = (pin) => {
+    setParticipantPin(pin);
+    setPage('participant-name');
+  };
+
+  const handleStartQuiz = (name) => {
+    setParticipantName(name);
+    setPage('play');
+  };
+
+  const handleSaveQuiz = (quizId, payload) => {
     setQuizzes((current) => current.map((quiz) => {
       if (quiz.id !== quizId) {
         return quiz;
@@ -486,14 +687,15 @@ export default function App() {
       return {
         ...quiz,
         title: payload.title || quiz.title,
-        questions: [...quiz.questions, payload.question],
+        questions: payload.questions,
       };
     }));
   };
 
   return (
     <>
-      {page === 'home' && <HomePage onNavigate={setPage} onPlay={() => setPage('play')} />}
+      {page === 'home' && <HomePage onNavigate={setPage} onJoin={handleJoinQuiz} />}
+      {page === 'participant-name' && <ParticipantNamePage pin={participantPin} onStart={handleStartQuiz} />}
       {page === 'login' && <AuthPage mode="login" onNavigate={setPage} />}
       {page === 'register' && <AuthPage mode="register" onNavigate={setPage} />}
       {page === 'dashboard' && (
@@ -505,8 +707,8 @@ export default function App() {
           onEdit={handleEditQuiz}
         />
       )}
-      {page === 'editor' && <EditorPage quiz={activeQuiz} onNavigate={setPage} onSaveQuestion={handleSaveQuestion} />}
-      {page === 'play' && <PlayPage quiz={activeQuiz} onNavigate={setPage} />}
+      {page === 'editor' && <EditorPage quiz={activeQuiz} onNavigate={setPage} onSaveQuiz={handleSaveQuiz} />}
+      {page === 'play' && <PlayPage quiz={activeQuiz} onNavigate={setPage} participantName={participantName} />}
       {page === 'result' && <ResultPage onNavigate={setPage} />}
       {showCreateModal && <CreateQuizModal onClose={() => setShowCreateModal(false)} onSubmit={handleCreateQuiz} />}
     </>
