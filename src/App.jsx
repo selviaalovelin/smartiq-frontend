@@ -44,6 +44,40 @@ const starterQuizzes = [
   { id: 'quiz-4', title: 'Soal Quiz 4', category: 'Pemrograman Internet', questions: [] },
 ];
 
+const isBackendId = (id) => /^\d+$/.test(String(id));
+const normalizeBackendQuiz = (quiz, currentQuizzes = []) => {
+  const localQuiz = currentQuizzes.find((item) => String(item.id) === String(quiz.id));
+
+  return {
+    id: String(quiz.id),
+    title: quiz.title,
+    category: quiz.category || 'Layanan Web',
+    pin: quiz.pin,
+    questions: localQuiz?.questions || [],
+  };
+};
+
+async function requestJson(path, options = {}) {
+  const response = await fetch(path, {
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+    ...options,
+  });
+
+  if (!response.ok) {
+    throw new Error(`Request gagal: ${response.status}`);
+  }
+
+  if (response.status === 204) {
+    return null;
+  }
+
+  return response.json();
+}
+
 function Brand() {
   return (
     <strong className="brand">
@@ -872,13 +906,62 @@ export default function App() {
   const activeQuiz = quizzes.find((quiz) => quiz.id === activeQuizId) || quizzes[0];
   const assigningQuiz = quizzes.find((quiz) => quiz.id === assigningQuizId);
 
-  const handleCreateQuiz = ({ title, category }) => {
-    const quiz = {
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadQuizzes = async () => {
+      try {
+        const payload = await requestJson('/api/quizzes');
+        const backendQuizzes = Array.isArray(payload?.data) ? payload.data : [];
+
+        if (!isMounted || !backendQuizzes.length) {
+          return;
+        }
+
+        setQuizzes((current) => backendQuizzes.map((quiz) => normalizeBackendQuiz(quiz, current)));
+        setActiveQuizId((current) => (
+          backendQuizzes.some((quiz) => String(quiz.id) === String(current))
+            ? String(current)
+            : String(backendQuizzes[0].id)
+        ));
+      } catch (error) {
+        console.info('Backend kuis belum tersedia, memakai data lokal.', error);
+      }
+    };
+
+    loadQuizzes();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const handleCreateQuiz = async ({ title, category }) => {
+    const quizTitle = title || `Soal Quiz ${quizzes.length + 1}`;
+    const localQuiz = {
       id: `quiz-${Date.now()}`,
-      title: title || `Soal Quiz ${quizzes.length + 1}`,
+      title: quizTitle,
       category,
       questions: [],
     };
+
+    let quiz = localQuiz;
+
+    try {
+      const payload = await requestJson('/api/quizzes', {
+        method: 'POST',
+        body: JSON.stringify({
+          title: quizTitle,
+          category,
+        }),
+      });
+
+      if (payload?.data) {
+        quiz = normalizeBackendQuiz(payload.data);
+      }
+    } catch (error) {
+      console.info('Kuis disimpan lokal karena backend belum tersedia.', error);
+    }
 
     setQuizzes((current) => [quiz, ...current]);
     setActiveQuizId(quiz.id);
@@ -920,11 +1003,26 @@ export default function App() {
     setActivePanel('laporan');
   };
 
-  const handleDeleteQuiz = (id) => {
-    setQuizzes((current) => current.filter((quiz) => quiz.id !== id));
-    if (activeQuizId === id) {
-      setActiveQuizId(starterQuizzes[0].id);
+  const handleDeleteQuiz = async (id) => {
+    if (isBackendId(id)) {
+      try {
+        await requestJson(`/api/quizzes/${id}`, {
+          method: 'DELETE',
+        });
+      } catch (error) {
+        console.info('Kuis dihapus lokal karena backend belum tersedia.', error);
+      }
     }
+
+    setQuizzes((current) => {
+      const nextQuizzes = current.filter((quiz) => quiz.id !== id);
+
+      if (activeQuizId === id) {
+        setActiveQuizId(nextQuizzes[0]?.id || starterQuizzes[0].id);
+      }
+
+      return nextQuizzes;
+    });
   };
 
   const handleJoinQuiz = (pin) => {
@@ -937,7 +1035,23 @@ export default function App() {
     setPage('participant-waiting');
   };
 
-  const handleSaveQuiz = (quizId, payload) => {
+  const handleSaveQuiz = async (quizId, payload) => {
+    const currentQuiz = quizzes.find((quiz) => quiz.id === quizId);
+
+    if (isBackendId(quizId)) {
+      try {
+        await requestJson(`/api/quizzes/${quizId}`, {
+          method: 'PUT',
+          body: JSON.stringify({
+            title: payload.title || currentQuiz?.title || 'Soal Quiz',
+            category: currentQuiz?.category || 'Layanan Web',
+          }),
+        });
+      } catch (error) {
+        console.info('Perubahan metadata kuis disimpan lokal karena backend belum tersedia.', error);
+      }
+    }
+
     setQuizzes((current) => current.map((quiz) => {
       if (quiz.id !== quizId) {
         return quiz;
