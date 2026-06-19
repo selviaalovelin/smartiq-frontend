@@ -10,6 +10,9 @@
   --ink: #171717;
   --font-ui: "Baloo 2", "Trebuchet MS", Arial, sans-serif;
   --font-brand: "Bangers", "Baloo 2", cursive;
+  --bg-login: url("/backgrounds/kelas-login.jpeg");
+  --bg-board: url("/backgrounds/kelas-3.avif");
+  --bg-editor: url("/backgrounds/kelas-2.avif");
 }
 
 * {
@@ -65,7 +68,9 @@ button:disabled {
 .blue-page {
   position: relative;
   overflow: hidden;
-  background: var(--screen-blue);
+  background:
+    linear-gradient(rgba(6, 45, 81, .42), rgba(6, 45, 81, .42)),
+    var(--bg-login) center / cover no-repeat;
 }
 
 .blue-page::before,
@@ -76,21 +81,11 @@ button:disabled {
 }
 
 .blue-page::before {
-  top: -230px;
-  left: -180px;
-  width: 520px;
-  height: 620px;
-  border-radius: 50%;
-  background: rgba(34, 105, 163, .32);
+  display: none;
 }
 
 .blue-page::after {
-  top: -90px;
-  right: 12%;
-  width: 250px;
-  height: 640px;
-  transform: skewX(-32deg);
-  background: rgba(13, 58, 111, .28);
+  display: none;
 }
 
 .top-nav {
@@ -385,6 +380,8 @@ button:disabled {
 }
 
 .dashboard-content {
+  position: relative;
+  z-index: 1;
   padding: 28px;
 }
 
@@ -455,11 +452,14 @@ button:disabled {
 }
 
 .quiz-table {
-  overflow: hidden;
+  position: relative;
+  z-index: 3;
+  overflow: visible;
   border-radius: 0;
 }
 
 .quiz-row {
+  position: relative;
   display: grid;
   min-height: 58px;
   align-items: center;
@@ -469,7 +469,12 @@ button:disabled {
   font-size: 1rem;
 }
 
+.quiz-row:has(.quiz-menu) {
+  z-index: 20;
+}
+
 .quiz-row.head {
+  z-index: 1;
   min-height: 40px;
   background: var(--card-dark);
   text-align: center;
@@ -485,11 +490,51 @@ button:disabled {
   font-weight: 900;
 }
 
+.quiz-actions-menu {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  z-index: 25;
+}
+
+.quiz-menu {
+  position: absolute;
+  z-index: 40;
+  top: 38px;
+  right: -22px;
+  width: 282px;
+  min-height: 216px;
+  padding: 14px 18px;
+  background: #b4b8b9;
+  box-shadow: 0 12px 22px rgba(0, 0, 0, .22);
+}
+
+.quiz-menu button {
+  width: 100%;
+  min-height: 47px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  border: 0;
+  background: transparent;
+  color: #181818;
+  font-size: 1.05rem;
+  font-weight: 900;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.quiz-menu svg {
+  width: 24px;
+  height: 24px;
+  flex: 0 0 auto;
+}
+
 .report-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(220px, 1fr));
   gap: 22px;
-  max-width: 760px;
+  max-width: 860px;
 }
 
 .report-card {
@@ -501,6 +546,150 @@ button:disabled {
   background: transparent;
   color: #0088c2;
   font-weight: 800;
+}
+
+.assignment-report-card {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: 1fr 1.3fr;
+  gap: 24px;
+  width: min(760px, 100%);
+  min-height: 190px;
+  padding: 22px 26px;
+  border-radius: 6px;
+  background: var(--card);
+}
+
+.assignment-report-card span,
+.assignment-report-card dt,
+.assignment-report-card dd {
+  font-weight: 800;
+}
+
+.assignment-report-card strong {
+  display: block;
+  margin-top: 12px;
+  font-size: 1.1rem;
+}
+
+.assignment-report-card dl {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+}
+
+.assignment-report-card dl div {
+  display: grid;
+  grid-template-columns: 145px 1fr 48px;
+  align-items: center;
+  gap: 8px;
+}
+
+.assignment-report-card dt,
+.assignment-report-card dd {
+  margin: 0;
+}
+
+.assignment-report-card button {
+  border: 0;
+  background: transparent;
+  color: #0088c2;
+  font-weight: 900;
+  text-align: left;
+}
+
+.assignment-report-card button:hover,
+.assignment-report-card button:focus-visible {
+  color: #055e84;
+  text-decoration: underline;
+}
+
+.assignment-modal-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: grid;
+  place-items: center;
+  background: rgba(0, 0, 0, .34);
+}
+
+.assignment-modal {
+  width: min(560px, calc(100vw - 56px));
+  padding: 28px 30px 22px;
+  border-radius: 7px;
+  background: #aaa;
+  color: #1c1c1c;
+  box-shadow: 0 16px 28px rgba(0, 0, 0, .18);
+}
+
+.assignment-modal p {
+  margin: 0 0 22px;
+  font-size: 1.1rem;
+  font-weight: 800;
+}
+
+.assignment-fields {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(150px, .65fr);
+  gap: 26px;
+  align-items: start;
+}
+
+.assignment-fields label {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  font-weight: 900;
+}
+
+.assignment-fields select {
+  width: 100%;
+  height: 58px;
+  min-width: 0;
+  padding: 0 34px 0 16px;
+  border: 0;
+  border-radius: 6px;
+  appearance: none;
+  background:
+    linear-gradient(45deg, transparent 50%, #1d1d1d 50%) calc(100% - 25px) 50% / 12px 12px no-repeat,
+    linear-gradient(135deg, #1d1d1d 50%, transparent 50%) calc(100% - 17px) 50% / 12px 12px no-repeat,
+    #c8c8c8;
+  color: #1d1d1d;
+  font-size: 1rem;
+  font-weight: 800;
+}
+
+.date-select-grid {
+  display: grid;
+  grid-template-columns: 82px minmax(132px, 1fr) 108px;
+  gap: 10px;
+  min-width: 0;
+}
+
+.assignment-actions {
+  display: flex;
+  justify-content: end;
+  gap: 10px;
+  margin-top: 24px;
+}
+
+.assignment-actions button {
+  width: 150px;
+  height: 58px;
+  border: 0;
+  border-radius: 6px;
+  font-size: 1rem;
+  font-weight: 900;
+}
+
+.assignment-cancel {
+  background: #c5c5c5;
+  color: #1f1f1f;
+}
+
+.assignment-submit {
+  background: #3d87b2;
+  color: #e7e7e7;
 }
 
 .modal {
@@ -606,12 +795,15 @@ button:disabled {
   position: relative;
   min-height: 100vh;
   background:
-    linear-gradient(rgba(7, 38, 62, .58), rgba(7, 38, 62, .58)),
-    radial-gradient(ellipse at 8% 18%, rgba(255, 255, 255, .24) 0 18%, transparent 19%),
-    radial-gradient(circle at 83% 16%, #e7f2f3 0 44px, #2986a7 45px 49px, transparent 50px),
-    linear-gradient(90deg, transparent 0 70%, rgba(99, 89, 105, .7) 70% 100%),
-    linear-gradient(#82bed1 0 18%, #36869f 18% 35%, #0b6683 35% 67%, #6f8d9a 67% 68%, #496979 68% 100%);
+    linear-gradient(rgba(18, 43, 63, .48), rgba(18, 43, 63, .48)),
+    var(--bg-board) center / cover no-repeat;
   overflow: hidden;
+}
+
+.editor-page.classroom-page {
+  background:
+    linear-gradient(rgba(18, 43, 63, .42), rgba(18, 43, 63, .42)),
+    var(--bg-editor) center / cover no-repeat;
 }
 
 .classroom-scene::before,
@@ -623,49 +815,25 @@ button:disabled {
 
 .classroom-scene::before {
   inset: 0;
-  background:
-    linear-gradient(90deg, rgba(31, 49, 75, .45) 0 15%, transparent 15% 100%),
-    linear-gradient(90deg, transparent 25%, rgba(62, 45, 64, .95) 25% 26%, #0d6078 26% 70%, rgba(62, 45, 64, .95) 70% 71%, transparent 71%),
-    linear-gradient(#734758, #734758) 27% 13% / 42% 3px no-repeat,
-    linear-gradient(#734758, #734758) 27% 57% / 42% 4px no-repeat,
-    linear-gradient(90deg, #5f6f79, #8aa0a8) 0 68% / 100% 4px no-repeat,
-    repeating-linear-gradient(90deg, rgba(25, 59, 76, .25) 0 2px, transparent 2px 88px);
-  opacity: .78;
+  background: rgba(15, 49, 76, .22);
 }
 
 .classroom-scene::after {
-  left: 0;
-  right: 0;
-  bottom: -4px;
-  height: 185px;
-  background:
-    linear-gradient(90deg, rgba(49, 70, 82, .72) 0 26%, transparent 26% 70%, rgba(50, 60, 71, .72) 70% 100%),
-    linear-gradient(rgba(38, 69, 87, .72), rgba(38, 69, 87, .72)),
-    repeating-linear-gradient(100deg, rgba(16, 47, 68, .32) 0 3px, transparent 3px 24px);
+  display: none;
 }
 
 .participant-login.classroom-scene {
   background:
-    linear-gradient(rgba(13, 49, 75, .62), rgba(13, 49, 75, .62)),
-    radial-gradient(ellipse at 8% 24%, rgba(255, 255, 255, .3) 0 16%, transparent 17%),
-    radial-gradient(circle at 50% 11%, #dce5e3 0 30px, #8b2f73 31px 35px, transparent 36px),
-    linear-gradient(90deg, rgba(73, 85, 92, .85) 0 16%, transparent 16% 84%, rgba(73, 85, 92, .85) 84% 100%),
-    linear-gradient(#74bbcf 0 10%, #2e879f 10% 54%, #3d6f88 54% 100%);
+    linear-gradient(rgba(13, 49, 75, .56), rgba(13, 49, 75, .56)),
+    var(--bg-login) center / cover no-repeat;
 }
 
 .participant-login.classroom-scene::before {
-  background:
-    linear-gradient(#243d59, #243d59) 34% 16% / 32% 3px no-repeat,
-    linear-gradient(#243d59, #243d59) 34% 39% / 32% 4px no-repeat,
-    linear-gradient(90deg, #1d5770, #0b5d79) 34% 16% / 32% 23% no-repeat,
-    repeating-linear-gradient(90deg, #6686a3 0 8px, #315c80 8px 12px, transparent 12px 19px) 16% 24% / 16% 23% no-repeat,
-    linear-gradient(#9eb3bd, #637984) 11% 69% / 28% 19% no-repeat,
-    linear-gradient(#9eb3bd, #637984) 45% 77% / 22% 17% no-repeat,
-    linear-gradient(#9eb3bd, #637984) 80% 69% / 24% 18% no-repeat;
+  background: rgba(11, 50, 78, .16);
 }
 
 .participant-login.classroom-scene::after {
-  height: 170px;
+  display: none;
 }
 
 .editor-form {
@@ -810,6 +978,13 @@ button:disabled {
   text-align: center;
 }
 
+.image-upload {
+  position: relative;
+  width: 265px;
+  min-height: 76px;
+  margin: 0 auto 72px;
+}
+
 .image-button {
   display: flex;
   align-items: center;
@@ -818,13 +993,52 @@ button:disabled {
   gap: 2px;
   width: 265px;
   height: 76px;
-  margin: 0 auto 72px;
   border: 0;
   border-radius: 6px;
   background: var(--card);
   color: #1f1f1f;
   font-size: 1.55rem;
   font-weight: 900;
+  cursor: pointer;
+}
+
+.image-button input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.image-upload.has-image {
+  width: min(360px, 55vw);
+  min-height: 170px;
+  border-radius: 8px;
+  background: rgba(189, 187, 185, .92);
+  box-shadow: 0 8px 18px rgba(0, 0, 0, .16);
+}
+
+.image-upload img {
+  display: block;
+  width: 100%;
+  height: 170px;
+  object-fit: contain;
+  border-radius: 8px;
+}
+
+.remove-image-button {
+  position: absolute;
+  top: -10px;
+  right: -10px;
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: #202020;
+  color: #f1f1f1;
+  font-size: .95rem;
 }
 
 .answer-grid {
@@ -922,6 +1136,122 @@ button:disabled {
   font-size: 1.65rem;
 }
 
+.live-page {
+  position: relative;
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  background:
+    linear-gradient(rgba(17, 50, 78, .56), rgba(17, 50, 78, .56)),
+    var(--bg-editor) center / cover no-repeat;
+}
+
+.live-status-card,
+.live-pin-card,
+.live-wait-card {
+  position: relative;
+  z-index: 2;
+  border-radius: 8px;
+  background: rgba(189, 187, 185, .94);
+  color: #1d1d1d;
+  font-weight: 900;
+  text-align: center;
+}
+
+.live-status-card {
+  min-width: 290px;
+  padding: 24px 34px;
+  font-size: 1.5rem;
+}
+
+.live-host-page {
+  align-content: center;
+  gap: 20px;
+  padding: 8vh 24px;
+}
+
+.live-pin-card {
+  width: min(480px, calc(100vw - 48px));
+  padding: 18px 22px;
+  font-size: clamp(1.2rem, 2.6vw, 1.85rem);
+}
+
+.live-waiting-label {
+  position: relative;
+  z-index: 2;
+  min-width: 210px;
+  padding: 14px 22px;
+  border-radius: 7px;
+  background: var(--blue);
+  color: #d7d7d7;
+  font-weight: 900;
+  text-align: center;
+}
+
+.participant-list {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 34px;
+  width: min(560px, 100%);
+}
+
+.participant-item {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  min-width: 92px;
+  color: #e7e7e7;
+  font-size: 1.15rem;
+  text-shadow: 0 2px 3px rgba(0, 0, 0, .32);
+}
+
+.participant-item svg {
+  width: 38px;
+  height: 38px;
+}
+
+.live-question-count {
+  position: relative;
+  z-index: 2;
+  margin: 0;
+  color: #efefef;
+  font-weight: 900;
+  text-shadow: 0 2px 3px rgba(0, 0, 0, .35);
+}
+
+.live-start-button {
+  position: relative;
+  z-index: 2;
+  width: min(230px, 68vw);
+  height: 54px;
+  border: 0;
+  border-radius: 7px;
+  background: #0788ad;
+  color: #e7e7e7;
+  font-weight: 900;
+}
+
+.live-wait-card {
+  width: min(560px, calc(100vw - 48px));
+  padding: 24px 28px;
+}
+
+.live-wait-card p {
+  margin: 0 0 14px;
+  font-size: clamp(1.15rem, 2.5vw, 1.6rem);
+}
+
+.live-wait-card strong,
+.live-wait-card span {
+  display: block;
+  color: #0a4f8d;
+  font-size: 1.1rem;
+}
+
 .play-page,
 .result-page {
   position: relative;
@@ -935,7 +1265,7 @@ button:disabled {
   min-height: 91px;
   display: grid;
   align-items: center;
-  margin: 0 auto 205px;
+  margin: 0 auto 34px;
   padding: 20px 28px;
   border-radius: 8px;
   background: #bbb9b8;
@@ -944,6 +1274,24 @@ button:disabled {
   font-weight: 900;
   line-height: 1.15;
   text-align: left;
+}
+
+.play-question-image {
+  position: relative;
+  z-index: 2;
+  width: min(360px, 56vw);
+  margin: 0 auto 44px;
+  padding: 10px;
+  border-radius: 8px;
+  background: rgba(187, 185, 184, .9);
+}
+
+.play-question-image img {
+  display: block;
+  width: 100%;
+  max-height: 190px;
+  object-fit: contain;
+  border-radius: 5px;
 }
 
 .countdown {
@@ -1149,6 +1497,85 @@ button:disabled {
 
   .play-options {
     gap: 14px;
+  }
+
+  .quiz-menu {
+    right: -8px;
+    width: 220px;
+    min-height: 190px;
+    padding: 10px 12px;
+  }
+
+  .quiz-menu button {
+    min-height: 41px;
+    gap: 9px;
+    font-size: .9rem;
+  }
+
+  .live-page {
+    min-height: 100svh;
+    background-size: cover;
+  }
+
+  .live-host-page {
+    gap: 16px;
+    padding: 22vh 14px 18vh;
+  }
+
+  .live-pin-card {
+    padding: 13px 16px;
+    font-size: 1.05rem;
+  }
+
+  .participant-list {
+    gap: 18px;
+  }
+
+  .participant-item {
+    min-width: 70px;
+    font-size: .95rem;
+  }
+
+  .participant-item svg {
+    width: 30px;
+    height: 30px;
+  }
+
+  .assignment-modal {
+    width: min(520px, calc(100vw - 36px));
+    padding: 18px;
+  }
+
+  .assignment-fields {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+
+  .date-select-grid {
+    grid-template-columns: 70px minmax(112px, 1fr) 92px;
+    gap: 7px;
+  }
+
+  .assignment-fields select {
+    height: 48px;
+    padding-left: 10px;
+    padding-right: 28px;
+    font-size: .86rem;
+  }
+
+  .assignment-actions button {
+    width: 116px;
+    height: 48px;
+  }
+
+  .assignment-report-card {
+    grid-template-columns: 1fr;
+    padding: 18px;
+  }
+
+  .assignment-report-card dl div {
+    grid-template-columns: 1fr;
+    gap: 3px;
   }
 
   .countdown {

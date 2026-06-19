@@ -4,15 +4,20 @@ import {
   FaChartBar,
   FaChartLine,
   FaArrowRight,
+  FaBroadcastTower,
   FaFileAlt,
   FaCog,
+  FaEdit,
   FaHome,
   FaImage,
   FaList,
   FaPencilAlt,
   FaPlus,
+  FaTasks,
   FaTimes,
+  FaTrash,
   FaUserCircle,
+  FaUserPlus,
 } from 'react-icons/fa';
 import { BsThreeDotsVertical } from 'react-icons/bs';
 
@@ -48,6 +53,26 @@ function Brand() {
 }
 
 const isEmailValid = (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+const monthNames = [
+  'Januari',
+  'Februari',
+  'Maret',
+  'April',
+  'Mei',
+  'Juni',
+  'Juli',
+  'Agustus',
+  'September',
+  'Oktober',
+  'November',
+  'Desember',
+];
+const yearOptions = Array.from({ length: 7 }, (_, index) => 2026 + index);
+const dayOptions = Array.from({ length: 31 }, (_, index) => index + 1);
+const hourOptions = Array.from({ length: 24 }, (_, index) => `${String(index).padStart(2, '0')}:00`);
+
+const formatDate = ({ day, month, year }) => `${day} ${monthNames[month - 1]} ${year}`;
+const slugifyTitle = (title) => title.replace(/\s+/g, '').replace(/[^\w]/g, '') || 'soalQuiz';
 
 function FieldError({ message }) {
   return message ? <p className="field-error">{message}</p> : null;
@@ -142,6 +167,23 @@ function ParticipantNamePage({ onStart }) {
           <FieldError message={nameError} />
           <button className={!nickname.trim() ? 'is-disabled' : ''} type="submit">Oke, Mulai!</button>
         </form>
+      </div>
+    </section>
+  );
+}
+
+function ParticipantWaitingPage({ pin, participantName, onReady }) {
+  useEffect(() => {
+    const timer = window.setTimeout(onReady, 2400);
+    return () => window.clearTimeout(timer);
+  }, [onReady]);
+
+  return (
+    <section className="page live-page live-wait-page">
+      <div className="live-wait-card">
+        <p>Anda sudah masuk, tunggu penyelenggara kuis memulai kuis!</p>
+        <strong>{participantName || 'Peserta'}</strong>
+        <span>PIN {pin || '109276'}</span>
       </div>
     </section>
   );
@@ -242,8 +284,10 @@ function AuthPage({ mode, onNavigate }) {
   );
 }
 
-function DashboardPage({ quizzes, activePanel, setActivePanel, onCreate, onEdit }) {
+function DashboardPage({ quizzes, assignments, activePanel, setActivePanel, onCreate, onEdit, onStartLive, onAssign, onDelete }) {
   const [keyword, setKeyword] = useState('');
+  const [openMenuId, setOpenMenuId] = useState('');
+  const [copiedValue, setCopiedValue] = useState('');
 
   const totalQuestions = quizzes.reduce((total, quiz) => total + quiz.questions.length, 0);
   const finishedReports = quizzes.filter((quiz) => quiz.questions.length > 0).length;
@@ -255,6 +299,28 @@ function DashboardPage({ quizzes, activePanel, setActivePanel, onCreate, onEdit 
       return result;
     }, {});
   }, [quizzes]);
+
+  const copyText = async (value) => {
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(value);
+      } else {
+        const textArea = document.createElement('textarea');
+        textArea.value = value;
+        textArea.style.position = 'fixed';
+        textArea.style.opacity = '0';
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+      }
+      setCopiedValue(value);
+      window.setTimeout(() => setCopiedValue(''), 1500);
+    } catch {
+      window.prompt('Salin manual:', value);
+    }
+  };
 
   return (
     <section className="page dashboard-page">
@@ -308,7 +374,17 @@ function DashboardPage({ quizzes, activePanel, setActivePanel, onCreate, onEdit 
                 {filteredQuizzes.map((quiz) => (
                   <div className="quiz-row" key={quiz.id}>
                     <span>{quiz.title}</span>
-                    <button className="dots-button" type="button" onClick={() => onEdit(quiz.id)}><BsThreeDotsVertical /></button>
+                    <div className="quiz-actions-menu">
+                      <button className="dots-button" type="button" onClick={() => setOpenMenuId((current) => (current === quiz.id ? '' : quiz.id))}><BsThreeDotsVertical /></button>
+                      {openMenuId === quiz.id && (
+                        <div className="quiz-menu">
+                          <button type="button" onClick={() => { setOpenMenuId(''); onStartLive(quiz.id); }}><FaBroadcastTower /> Selenggarakan live</button>
+                          <button type="button" onClick={() => { setOpenMenuId(''); onAssign(quiz.id); }}><FaUserPlus /> Tugaskan</button>
+                          <button type="button" onClick={() => { setOpenMenuId(''); onEdit(quiz.id); }}><FaEdit /> Edit</button>
+                          <button type="button" onClick={() => { setOpenMenuId(''); onDelete(quiz.id); }}><FaTrash /> Hapus</button>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -317,7 +393,22 @@ function DashboardPage({ quizzes, activePanel, setActivePanel, onCreate, onEdit 
 
           {activePanel === 'laporan' && (
             <div className="report-grid">
-              {Object.entries(groupedReports).map(([category, count]) => (
+              {assignments.map((assignment) => (
+                <article className="assignment-report-card" key={assignment.id}>
+                  <div>
+                    <span>Laporan</span>
+                    <strong>{assignment.title}</strong>
+                  </div>
+                  <dl>
+                    <div><dt>Tanggal mulai:</dt><dd>{assignment.startDate}</dd></div>
+                    <div><dt>Tanggal selesai:</dt><dd>{assignment.endDate}</dd></div>
+                    <div><dt>Diselenggarakan oleh:</dt><dd>{assignment.host}</dd></div>
+                    <div><dt>Pin game:</dt><dd>{assignment.pin}</dd><button type="button" onClick={() => copyText(assignment.pin)}>{copiedValue === assignment.pin ? 'Tersalin' : 'Salin'}</button></div>
+                    <div><dt>URL:</dt><dd>{assignment.url}</dd><button type="button" onClick={() => copyText(assignment.url)}>{copiedValue === assignment.url ? 'Tersalin' : 'Salin'}</button></div>
+                  </dl>
+                </article>
+              ))}
+              {!assignments.length && Object.entries(groupedReports).map(([category, count]) => (
                 <article className="report-card" key={category}>
                   <h3>{category}</h3>
                   <strong>{count ? `${count} Soal Tersedia` : 'Belum Tersedia Soal'}</strong>
@@ -334,6 +425,7 @@ function DashboardPage({ quizzes, activePanel, setActivePanel, onCreate, onEdit 
 
 const createEmptyQuestion = () => ({
   text: '',
+  image: '',
   answers: ['', '', '', ''],
   correct: 'A',
   timeLimit: 10,
@@ -379,6 +471,66 @@ function CreateQuizModal({ onClose, onSubmit }) {
   );
 }
 
+function AssignQuizModal({ quiz, onClose, onSubmit }) {
+  const [deadline, setDeadline] = useState({
+    day: 26,
+    month: 4,
+    year: 2026,
+    hour: '23:00',
+  });
+
+  const updateDeadline = (field, value) => {
+    setDeadline((current) => ({
+      ...current,
+      [field]: field === 'day' || field === 'month' || field === 'year' ? Number(value) : value,
+    }));
+  };
+
+  const handleSubmit = (event) => {
+    event.preventDefault();
+    onSubmit({
+      quizId: quiz.id,
+      title: quiz.title,
+      endDate: formatDate(deadline),
+      endTime: deadline.hour,
+    });
+  };
+
+  return (
+    <div className="assignment-modal-layer">
+      <form className="assignment-modal" onSubmit={handleSubmit}>
+        <p>Peserta harus menyelesaikannya sebelum:</p>
+        <div className="assignment-fields">
+          <label>
+            Tanggal
+            <div className="date-select-grid">
+              <select value={deadline.day} onChange={(event) => updateDeadline('day', event.target.value)}>
+                {dayOptions.map((day) => <option value={day} key={day}>{day}</option>)}
+              </select>
+              <select value={deadline.month} onChange={(event) => updateDeadline('month', event.target.value)}>
+                {monthNames.map((month, index) => <option value={index + 1} key={month}>{month}</option>)}
+              </select>
+              <select value={deadline.year} onChange={(event) => updateDeadline('year', event.target.value)}>
+                {yearOptions.map((year) => <option value={year} key={year}>{year}</option>)}
+              </select>
+            </div>
+          </label>
+          <label>
+            Jam
+            <select value={deadline.hour} onChange={(event) => updateDeadline('hour', event.target.value)}>
+              {hourOptions.map((hour) => <option value={hour} key={hour}>{hour}</option>)}
+            </select>
+          </label>
+        </div>
+        <div className="assignment-actions">
+          <button className="assignment-cancel" type="button" onClick={onClose}>Batal</button>
+          <button className="assignment-submit" type="submit">Buat</button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
 function EditorPage({ quiz, onNavigate, onSaveQuiz }) {
   const [title, setTitle] = useState(quiz.title);
   const [questions, setQuestions] = useState(() => (
@@ -412,6 +564,20 @@ function EditorPage({ quiz, onNavigate, onSaveQuiz }) {
     });
   };
 
+  const handleQuestionImage = (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) {
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      updateActiveQuestion({ image: reader.result });
+    };
+    reader.readAsDataURL(file);
+  };
+
   const handleAddQuestion = () => {
     setQuestions((current) => [...current, createEmptyQuestion()]);
     setActiveQuestionIndex(questions.length);
@@ -429,6 +595,7 @@ function EditorPage({ quiz, onNavigate, onSaveQuiz }) {
       title: title.trim(),
       questions: questions.map((item) => ({
         text: item.text.trim(),
+        image: item.image || '',
         answers: item.answers.map((answer) => answer.trim()),
         correct: item.correct,
         timeLimit: Number(item.timeLimit) || 10,
@@ -485,7 +652,20 @@ function EditorPage({ quiz, onNavigate, onSaveQuiz }) {
               placeholder="Mulai tulis soal"
             />
             <FieldError message={questionError} />
-            <button className="image-button" type="button"><FaPlus /> Tambah Gambar</button>
+            <div className={`image-upload ${activeQuestion.image ? 'has-image' : ''}`}>
+              {activeQuestion.image ? (
+                <>
+                  <img src={activeQuestion.image} alt="Gambar soal" />
+                  <button className="remove-image-button" type="button" onClick={() => updateActiveQuestion({ image: '' })} aria-label="Hapus gambar"><FaTimes /></button>
+                </>
+              ) : (
+                <label className="image-button">
+                  <input type="file" accept="image/*" onChange={handleQuestionImage} />
+                  <FaPlus />
+                  Tambah Gambar
+                </label>
+              )}
+            </div>
 
             <div className="answer-grid">
               {['A', 'B', 'C', 'D'].map((option, index) => (
@@ -519,6 +699,40 @@ function EditorPage({ quiz, onNavigate, onSaveQuiz }) {
           )}
         </div>
       </form>
+    </section>
+  );
+}
+
+function LiveCreatingPage({ onDone }) {
+  useEffect(() => {
+    const timer = window.setTimeout(onDone, 1300);
+    return () => window.clearTimeout(timer);
+  }, [onDone]);
+
+  return (
+    <section className="page live-page live-creating-page">
+      <div className="live-status-card">Membuat Pin Kuis.</div>
+    </section>
+  );
+}
+
+function LiveWaitingPage({ pin, quiz, onStart }) {
+  const participants = ['Wisnu', 'Kejora', 'Bintang'];
+
+  return (
+    <section className="page live-page live-host-page">
+      <div className="live-pin-card">Bergabung kuis dengan Pin {pin}</div>
+      <div className="live-waiting-label">Menunggu Peserta</div>
+      <div className="participant-list">
+        {participants.map((name) => (
+          <div className="participant-item" key={name}>
+            <FaUserCircle />
+            <strong>{name}</strong>
+          </div>
+        ))}
+      </div>
+      <p className="live-question-count">{quiz.questions.length || 1} pertanyaan siap</p>
+      <button className="live-start-button" type="button" onClick={onStart}>Mulai</button>
     </section>
   );
 }
@@ -597,6 +811,11 @@ function PlayPage({ quiz, onNavigate, participantName }) {
         <>
           <div className="countdown">{seconds}</div>
           <article className="play-question">{question.text}</article>
+          {question.image && (
+            <figure className="play-question-image">
+              <img src={question.image} alt="Gambar soal" />
+            </figure>
+          )}
           <div className="play-options">
             {question.answers.map((answer, index) => (
               <button
@@ -644,10 +863,14 @@ export default function App() {
   const [activePanel, setActivePanel] = useState('beranda');
   const [activeQuizId, setActiveQuizId] = useState(starterQuizzes[0].id);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [assigningQuizId, setAssigningQuizId] = useState('');
+  const [assignments, setAssignments] = useState([]);
   const [participantPin, setParticipantPin] = useState('');
   const [participantName, setParticipantName] = useState('');
+  const [livePin, setLivePin] = useState('109276');
 
   const activeQuiz = quizzes.find((quiz) => quiz.id === activeQuizId) || quizzes[0];
+  const assigningQuiz = quizzes.find((quiz) => quiz.id === assigningQuizId);
 
   const handleCreateQuiz = ({ title, category }) => {
     const quiz = {
@@ -668,6 +891,42 @@ export default function App() {
     setPage('editor');
   };
 
+  const handleStartLive = (id) => {
+    setActiveQuizId(id);
+    setLivePin(String(Math.floor(100000 + Math.random() * 900000)));
+    setPage('live-creating');
+  };
+
+  const handleAssignQuiz = (id) => {
+    setAssigningQuizId(id);
+  };
+
+  const handleCreateAssignment = (assignment) => {
+    const pin = String(Math.floor(100000 + Math.random() * 900000));
+    const startDate = formatDate({ day: 22, month: 4, year: 2026 });
+
+    setAssignments((current) => [
+      {
+        id: `assignment-${Date.now()}`,
+        ...assignment,
+        host: 'Wisnu',
+        startDate,
+        pin,
+        url: `https://smartq/${slugifyTitle(assignment.title)}`,
+      },
+      ...current,
+    ]);
+    setAssigningQuizId('');
+    setActivePanel('laporan');
+  };
+
+  const handleDeleteQuiz = (id) => {
+    setQuizzes((current) => current.filter((quiz) => quiz.id !== id));
+    if (activeQuizId === id) {
+      setActiveQuizId(starterQuizzes[0].id);
+    }
+  };
+
   const handleJoinQuiz = (pin) => {
     setParticipantPin(pin);
     setPage('participant-name');
@@ -675,7 +934,7 @@ export default function App() {
 
   const handleStartQuiz = (name) => {
     setParticipantName(name);
-    setPage('play');
+    setPage('participant-waiting');
   };
 
   const handleSaveQuiz = (quizId, payload) => {
@@ -701,16 +960,24 @@ export default function App() {
       {page === 'dashboard' && (
         <DashboardPage
           quizzes={quizzes}
+          assignments={assignments}
           activePanel={activePanel}
           setActivePanel={setActivePanel}
           onCreate={() => setShowCreateModal(true)}
           onEdit={handleEditQuiz}
+          onStartLive={handleStartLive}
+          onAssign={handleAssignQuiz}
+          onDelete={handleDeleteQuiz}
         />
       )}
+      {page === 'participant-waiting' && <ParticipantWaitingPage pin={participantPin} participantName={participantName} onReady={() => setPage('play')} />}
+      {page === 'live-creating' && <LiveCreatingPage onDone={() => setPage('live-waiting')} />}
+      {page === 'live-waiting' && <LiveWaitingPage pin={livePin} quiz={activeQuiz} onStart={() => setPage('play')} />}
       {page === 'editor' && <EditorPage quiz={activeQuiz} onNavigate={setPage} onSaveQuiz={handleSaveQuiz} />}
       {page === 'play' && <PlayPage quiz={activeQuiz} onNavigate={setPage} participantName={participantName} />}
       {page === 'result' && <ResultPage onNavigate={setPage} />}
       {showCreateModal && <CreateQuizModal onClose={() => setShowCreateModal(false)} onSubmit={handleCreateQuiz} />}
+      {assigningQuiz && <AssignQuizModal quiz={assigningQuiz} onClose={() => setAssigningQuizId('')} onSubmit={handleCreateAssignment} />}
     </>
   );
 }
