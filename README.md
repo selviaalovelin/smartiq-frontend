@@ -19,3 +19,18 @@ SMARTQ adalah rancangan aplikasi kuis interaktif berbasis web. Aplikasi ini meny
 - React JS
 - Vite
 - CSS
+
+## Koneksi API
+
+Frontend menggunakan API backend untuk akun pengajar, data kuis, soal, peserta, tugas, dan hasil kuis. Saat dijalankan dengan Vite, permintaan `/api` akan diteruskan ke backend pada `http://localhost:8000`.
+
+## Menjalankan Frontend
+
+Pastikan backend SMARTQ sudah berjalan di port `8000`, lalu jalankan:
+
+```bash
+npm install
+npm run dev
+```
+
+Buka alamat yang ditampilkan Vite, biasanya `http://localhost:5173`.
