@@ -203,6 +203,10 @@ button:disabled {
   text-align: center;
 }
 
+.pin-card .field-error {
+  color: #b11226;
+}
+
 .participant-content .brand {
   margin-bottom: 16px;
   color: #d2d2d2;
