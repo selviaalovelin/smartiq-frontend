@@ -45,15 +45,34 @@ const starterQuizzes = [
 ];
 
 const isBackendId = (id) => /^\d+$/.test(String(id));
-const normalizeBackendQuiz = (quiz, currentQuizzes = []) => {
-  const localQuiz = currentQuizzes.find((item) => String(item.id) === String(quiz.id));
-
-  return {
+const normalizeBackendQuiz = (quiz) => ({
     id: String(quiz.id),
     title: quiz.title,
     category: quiz.category || 'Layanan Web',
     pin: quiz.pin,
-    questions: localQuiz?.questions || [],
+    questions: (quiz.questions || []).map((question) => ({
+      id: String(question.id),
+      text: question.text,
+      image: question.image || '',
+      answers: Array.isArray(question.answers) ? question.answers : [],
+      correct: question.correct,
+      timeLimit: Number(question.time_limit ?? question.timeLimit ?? 10),
+    })),
+  });
+
+const normalizeBackendAssignment = (assignment) => {
+  const deadline = new Date(assignment.deadline);
+  const quiz = assignment.quiz || {};
+
+  return {
+    id: String(assignment.id),
+    quizId: String(assignment.quiz_id),
+    title: quiz.title || 'Kuis',
+    endDate: Number.isNaN(deadline.valueOf()) ? assignment.deadline : deadline.toLocaleDateString('id-ID'),
+    endTime: Number.isNaN(deadline.valueOf()) ? '' : deadline.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
+    host: assignment.host || 'Pengajar',
+    pin: quiz.pin || '-',
+    url: `${window.location.origin}?pin=${quiz.pin || ''}`,
   };
 };
 
@@ -113,8 +132,9 @@ function FieldError({ message }) {
 }
 
 function HomePage({ onNavigate, onJoin }) {
-  const [pin, setPin] = useState('109276');
+  const [pin, setPin] = useState('');
   const [submitted, setSubmitted] = useState(false);
+  const [serverError, setServerError] = useState('');
 
   const pinError = submitted
     ? !pin.trim()
@@ -124,13 +144,17 @@ function HomePage({ onNavigate, onJoin }) {
         : ''
     : '';
 
-  const handlePin = (event) => {
+  const handlePin = async (event) => {
     event.preventDefault();
     setSubmitted(true);
     if (!pin.trim() || pin.length < 4) {
       return;
     }
-    onJoin(pin);
+
+    const result = await onJoin(pin);
+    if (!result?.ok) {
+      setServerError(result?.message || 'PIN kuis tidak ditemukan.');
+    }
   };
 
   return (
@@ -156,6 +180,7 @@ function HomePage({ onNavigate, onJoin }) {
             inputMode="numeric"
           />
           <FieldError message={pinError} />
+          <FieldError message={serverError} />
           <button className={pin.length < 4 ? 'is-disabled' : ''} type="submit">Masuk</button>
         </form>
       </div>
@@ -166,6 +191,7 @@ function HomePage({ onNavigate, onJoin }) {
 function ParticipantNamePage({ onStart }) {
   const [nickname, setNickname] = useState('');
   const [submitted, setSubmitted] = useState(false);
+  const [serverError, setServerError] = useState('');
 
   const nameError = submitted
     ? !nickname.trim()
@@ -173,13 +199,16 @@ function ParticipantNamePage({ onStart }) {
       : ''
     : '';
 
-  const handleJoin = (event) => {
+  const handleJoin = async (event) => {
     event.preventDefault();
     setSubmitted(true);
     if (!nickname.trim()) {
       return;
     }
-    onStart(nickname.trim());
+    const result = await onStart(nickname.trim());
+    if (!result?.ok) {
+      setServerError(result?.message || 'Peserta belum bisa bergabung.');
+    }
   };
 
   return (
@@ -199,6 +228,7 @@ function ParticipantNamePage({ onStart }) {
             placeholder="Nama panggilan"
           />
           <FieldError message={nameError} />
+          <FieldError message={serverError} />
           <button className={!nickname.trim() ? 'is-disabled' : ''} type="submit">Oke, Mulai!</button>
         </form>
       </div>
@@ -223,11 +253,12 @@ function ParticipantWaitingPage({ pin, participantName, onReady }) {
   );
 }
 
-function AuthPage({ mode, onNavigate }) {
+function AuthPage({ mode, onNavigate, onAuthenticate }) {
   const isRegister = mode === 'register';
   const [form, setForm] = useState({ email: '', password: '', confirmPassword: '' });
   const [submitted, setSubmitted] = useState(false);
   const [touched, setTouched] = useState({});
+  const [serverError, setServerError] = useState('');
 
   const errors = {
     email: !form.email.trim()
@@ -256,13 +287,22 @@ function AuthPage({ mode, onNavigate }) {
     setForm((current) => ({ ...current, [field]: value }));
   };
 
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault();
     setSubmitted(true);
     if (!isFormValid) {
       return;
     }
-    onNavigate('dashboard');
+    try {
+      const payload = await requestJson(`/api/auth/${isRegister ? 'register' : 'login'}`, {
+        method: 'POST',
+        body: JSON.stringify({ email: form.email.trim(), password: form.password }),
+      });
+      onAuthenticate(payload.data);
+      onNavigate('dashboard');
+    } catch (error) {
+      setServerError(isRegister ? 'Email sudah terdaftar atau pendaftaran gagal.' : 'Email atau kata sandi salah.');
+    }
   };
 
   return (
@@ -306,6 +346,7 @@ function AuthPage({ mode, onNavigate }) {
         )}
 
         <button className={`primary-button ${!isFormValid ? 'is-disabled' : ''}`} type="submit">{isRegister ? 'Daftar' : 'Masuk'}</button>
+        <FieldError message={serverError} />
 
         <p>
           {isRegister ? 'Sudah punya akun?' : 'Belum memiliki akun?'}
@@ -380,22 +421,22 @@ function DashboardPage({ quizzes, assignments, activePanel, setActivePanel, onCr
                 <button className="stat-card" type="button" onClick={() => setActivePanel('pustaka')}>
                   <h2>Total soal</h2>
                   <FaFileAlt className="stat-icon" />
-                  <strong>{totalQuestions || 5} Soal</strong>
+                  <strong>{totalQuestions} Soal</strong>
                 </button>
                 <button className="stat-card" type="button" onClick={() => setActivePanel('pustaka')}>
                   <h2>Dibuat Hari Ini</h2>
                   <FaPencilAlt className="stat-icon" />
-                  <strong>{finishedReports || 1} Soal</strong>
+                  <strong>{finishedReports} Soal</strong>
                 </button>
                 <button className="stat-card" type="button" onClick={() => setActivePanel('laporan')}>
                   <h2>Laporan Selesai</h2>
                   <FaChartBar className="stat-icon" />
-                  <strong>{finishedReports || 1} Laporan</strong>
+                  <strong>{finishedReports} Laporan</strong>
                 </button>
               </div>
               <article className="activity-card">
                 <h2>Aktivitas Terbaru</h2>
-                <p>Buat soal: {quizzes[0]?.title || 'Soal Quiz 1'}</p>
+                <p>Buat soal: {quizzes[0]?.title || 'Belum ada kuis'}</p>
               </article>
             </>
           )}
@@ -522,11 +563,10 @@ function AssignQuizModal({ quiz, onClose, onSubmit }) {
 
   const handleSubmit = (event) => {
     event.preventDefault();
+    const deadlineDate = new Date(deadline.year, deadline.month - 1, deadline.day, Number(deadline.hour.slice(0, 2)));
     onSubmit({
       quizId: quiz.id,
-      title: quiz.title,
-      endDate: formatDate(deadline),
-      endTime: deadline.hour,
+      deadline: deadlineDate.toISOString(),
     });
   };
 
@@ -750,20 +790,19 @@ function LiveCreatingPage({ onDone }) {
   );
 }
 
-function LiveWaitingPage({ pin, quiz, onStart }) {
-  const participants = ['Wisnu', 'Kejora', 'Bintang'];
-
+function LiveWaitingPage({ pin, quiz, participants, onStart }) {
   return (
     <section className="page live-page live-host-page">
       <div className="live-pin-card">Bergabung kuis dengan Pin {pin}</div>
       <div className="live-waiting-label">Menunggu Peserta</div>
       <div className="participant-list">
-        {participants.map((name) => (
-          <div className="participant-item" key={name}>
+        {participants.map((participant) => (
+          <div className="participant-item" key={participant.id}>
             <FaUserCircle />
-            <strong>{name}</strong>
+            <strong>{participant.name}</strong>
           </div>
         ))}
+        {!participants.length && <p className="live-question-count">Belum ada peserta yang masuk.</p>}
       </div>
       <p className="live-question-count">{quiz.questions.length || 1} pertanyaan siap</p>
       <button className="live-start-button" type="button" onClick={onStart}>Mulai</button>
@@ -771,7 +810,7 @@ function LiveWaitingPage({ pin, quiz, onStart }) {
   );
 }
 
-function PlayPage({ quiz, onNavigate, participantName }) {
+function PlayPage({ quiz, onNavigate, participantName, onSubmitAnswer }) {
   const fallback = starterQuizzes[0].questions[0];
   const quizQuestions = quiz?.questions.length ? quiz.questions : [fallback];
   const [activeQuestionIndex, setActiveQuestionIndex] = useState(0);
@@ -822,8 +861,11 @@ function PlayPage({ quiz, onNavigate, participantName }) {
     onNavigate('result');
   };
 
-  const handleSelectAnswer = (option) => {
+  const handleSelectAnswer = async (option) => {
     setSelectedAnswer(option);
+    if (question.id) {
+      await onSubmitAnswer(question.id, option);
+    }
     window.setTimeout(goToNextQuestion, 1200);
   };
 
@@ -878,14 +920,20 @@ function PlayPage({ quiz, onNavigate, participantName }) {
   );
 }
 
-function ResultPage({ onNavigate }) {
+function ResultPage({ onNavigate, leaderboard }) {
+  const topScores = leaderboard.length ? leaderboard.slice(0, 3) : [
+    { id: 'empty-1', name: 'Belum ada hasil', score: 0 },
+  ];
+
   return (
     <section className="page result-page classroom-page">
       <button className="back-home" type="button" onClick={() => onNavigate('home')}>Kembali ke beranda</button>
       <div className="score-board">
-        <div className="score-bar red"><span>Kejora</span></div>
-        <div className="score-bar blue"><span>Wisnu</span></div>
-        <div className="score-bar green"><span>Bintang</span></div>
+        {topScores.map((participant, index) => (
+          <div className={`score-bar ${['red', 'blue', 'green'][index] || 'blue'}`} key={participant.id} style={{ height: `${Math.max(100, 90 + participant.score * 45)}px` }}>
+            <span>{participant.name} ({participant.score})</span>
+          </div>
+        ))}
       </div>
     </section>
   );
@@ -901,7 +949,11 @@ export default function App() {
   const [assignments, setAssignments] = useState([]);
   const [participantPin, setParticipantPin] = useState('');
   const [participantName, setParticipantName] = useState('');
-  const [livePin, setLivePin] = useState('109276');
+  const [participantId, setParticipantId] = useState('');
+  const [livePin, setLivePin] = useState('');
+  const [liveParticipants, setLiveParticipants] = useState([]);
+  const [leaderboard, setLeaderboard] = useState([]);
+  const [currentUser, setCurrentUser] = useState(null);
 
   const activeQuiz = quizzes.find((quiz) => quiz.id === activeQuizId) || quizzes[0];
   const assigningQuiz = quizzes.find((quiz) => quiz.id === assigningQuizId);
@@ -914,11 +966,16 @@ export default function App() {
         const payload = await requestJson('/api/quizzes');
         const backendQuizzes = Array.isArray(payload?.data) ? payload.data : [];
 
-        if (!isMounted || !backendQuizzes.length) {
+        if (!isMounted) {
           return;
         }
 
-        setQuizzes((current) => backendQuizzes.map((quiz) => normalizeBackendQuiz(quiz, current)));
+        setQuizzes(backendQuizzes.map(normalizeBackendQuiz));
+        if (!backendQuizzes.length) {
+          setActiveQuizId('');
+          return;
+        }
+
         setActiveQuizId((current) => (
           backendQuizzes.some((quiz) => String(quiz.id) === String(current))
             ? String(current)
@@ -930,6 +987,19 @@ export default function App() {
     };
 
     loadQuizzes();
+
+    const loadAssignments = async () => {
+      try {
+        const payload = await requestJson('/api/assignments');
+        if (isMounted) {
+          setAssignments((payload.data || []).map(normalizeBackendAssignment));
+        }
+      } catch (error) {
+        console.info('Backend tugas belum tersedia.', error);
+      }
+    };
+
+    loadAssignments();
 
     return () => {
       isMounted = false;
@@ -974,9 +1044,17 @@ export default function App() {
     setPage('editor');
   };
 
-  const handleStartLive = (id) => {
+  const handleStartLive = async (id) => {
+    const quiz = quizzes.find((item) => item.id === id);
     setActiveQuizId(id);
-    setLivePin(String(Math.floor(100000 + Math.random() * 900000)));
+    setLivePin(quiz?.pin || '');
+    try {
+      const payload = await requestJson(`/api/quizzes/${id}/participants`);
+      setLiveParticipants(payload.data || []);
+    } catch (error) {
+      console.info('Peserta live belum dapat dimuat.', error);
+      setLiveParticipants([]);
+    }
     setPage('live-creating');
   };
 
@@ -984,23 +1062,22 @@ export default function App() {
     setAssigningQuizId(id);
   };
 
-  const handleCreateAssignment = (assignment) => {
-    const pin = String(Math.floor(100000 + Math.random() * 900000));
-    const startDate = formatDate({ day: 22, month: 4, year: 2026 });
-
-    setAssignments((current) => [
-      {
-        id: `assignment-${Date.now()}`,
-        ...assignment,
-        host: 'Wisnu',
-        startDate,
-        pin,
-        url: `https://smartq/${slugifyTitle(assignment.title)}`,
-      },
-      ...current,
-    ]);
-    setAssigningQuizId('');
-    setActivePanel('laporan');
+  const handleCreateAssignment = async (assignment) => {
+    try {
+      const payload = await requestJson('/api/assignments', {
+        method: 'POST',
+        body: JSON.stringify({
+          quiz_id: assignment.quizId,
+          deadline: assignment.deadline,
+          host: currentUser?.name || 'Pengajar',
+        }),
+      });
+      setAssignments((current) => [normalizeBackendAssignment(payload.data), ...current]);
+      setAssigningQuizId('');
+      setActivePanel('laporan');
+    } catch (error) {
+      console.info('Tugas belum dapat disimpan ke backend.', error);
+    }
   };
 
   const handleDeleteQuiz = async (id) => {
@@ -1025,14 +1102,39 @@ export default function App() {
     });
   };
 
-  const handleJoinQuiz = (pin) => {
-    setParticipantPin(pin);
-    setPage('participant-name');
+  const handleJoinQuiz = async (pin) => {
+    try {
+      const payload = await requestJson(`/api/quizzes/pin/${pin}`);
+      const quiz = normalizeBackendQuiz(payload.data);
+      setQuizzes((current) => [quiz, ...current.filter((item) => item.id !== quiz.id)]);
+      setActiveQuizId(quiz.id);
+      setParticipantPin(pin);
+      setPage('participant-name');
+      return { ok: true };
+    } catch (error) {
+      return { ok: false, message: 'PIN kuis tidak ditemukan.' };
+    }
   };
 
-  const handleStartQuiz = (name) => {
-    setParticipantName(name);
-    setPage('participant-waiting');
+  const handleStartQuiz = async (name) => {
+    if (!isBackendId(activeQuizId)) {
+      return { ok: false, message: 'Kuis belum tersimpan di backend.' };
+    }
+
+    try {
+      const payload = await requestJson(`/api/quizzes/${activeQuizId}/participants`, {
+        method: 'POST',
+        body: JSON.stringify({ name }),
+      });
+      const quiz = normalizeBackendQuiz(payload.data.quiz);
+      setQuizzes((current) => [quiz, ...current.filter((item) => item.id !== quiz.id)]);
+      setParticipantName(name);
+      setParticipantId(String(payload.data.participant.id));
+      setPage('participant-waiting');
+      return { ok: true };
+    } catch (error) {
+      return { ok: false, message: 'Peserta belum bisa bergabung ke kuis.' };
+    }
   };
 
   const handleSaveQuiz = async (quizId, payload) => {
@@ -1040,13 +1142,17 @@ export default function App() {
 
     if (isBackendId(quizId)) {
       try {
-        await requestJson(`/api/quizzes/${quizId}`, {
+        const response = await requestJson(`/api/quizzes/${quizId}`, {
           method: 'PUT',
           body: JSON.stringify({
             title: payload.title || currentQuiz?.title || 'Soal Quiz',
             category: currentQuiz?.category || 'Layanan Web',
+            questions: payload.questions,
           }),
         });
+        const savedQuiz = normalizeBackendQuiz(response.data);
+        setQuizzes((current) => current.map((quiz) => (quiz.id === quizId ? savedQuiz : quiz)));
+        return;
       } catch (error) {
         console.info('Perubahan metadata kuis disimpan lokal karena backend belum tersedia.', error);
       }
@@ -1065,12 +1171,56 @@ export default function App() {
     }));
   };
 
+  const handleSubmitAnswer = async (questionId, selectedOption) => {
+    if (!isBackendId(activeQuizId) || !participantId) {
+      return;
+    }
+
+    try {
+      await requestJson(`/api/quizzes/${activeQuizId}/participants/${participantId}/answers`, {
+        method: 'POST',
+        body: JSON.stringify({ question_id: questionId, selected_option: selectedOption }),
+      });
+    } catch (error) {
+      console.info('Jawaban belum dapat disimpan.', error);
+    }
+  };
+
+  useEffect(() => {
+    if (page !== 'live-waiting' || !isBackendId(activeQuizId)) {
+      return undefined;
+    }
+
+    const loadParticipants = async () => {
+      try {
+        const payload = await requestJson(`/api/quizzes/${activeQuizId}/participants`);
+        setLiveParticipants(payload.data || []);
+      } catch (error) {
+        console.info('Peserta live belum dapat dimuat.', error);
+      }
+    };
+
+    loadParticipants();
+    const timer = window.setInterval(loadParticipants, 3000);
+    return () => window.clearInterval(timer);
+  }, [page, activeQuizId]);
+
+  useEffect(() => {
+    if (page !== 'result' || !isBackendId(activeQuizId)) {
+      return;
+    }
+
+    requestJson(`/api/quizzes/${activeQuizId}/leaderboard`)
+      .then((payload) => setLeaderboard(payload.data || []))
+      .catch((error) => console.info('Leaderboard belum dapat dimuat.', error));
+  }, [page, activeQuizId]);
+
   return (
     <>
       {page === 'home' && <HomePage onNavigate={setPage} onJoin={handleJoinQuiz} />}
       {page === 'participant-name' && <ParticipantNamePage pin={participantPin} onStart={handleStartQuiz} />}
-      {page === 'login' && <AuthPage mode="login" onNavigate={setPage} />}
-      {page === 'register' && <AuthPage mode="register" onNavigate={setPage} />}
+      {page === 'login' && <AuthPage mode="login" onNavigate={setPage} onAuthenticate={setCurrentUser} />}
+      {page === 'register' && <AuthPage mode="register" onNavigate={setPage} onAuthenticate={setCurrentUser} />}
       {page === 'dashboard' && (
         <DashboardPage
           quizzes={quizzes}
@@ -1086,10 +1236,10 @@ export default function App() {
       )}
       {page === 'participant-waiting' && <ParticipantWaitingPage pin={participantPin} participantName={participantName} onReady={() => setPage('play')} />}
       {page === 'live-creating' && <LiveCreatingPage onDone={() => setPage('live-waiting')} />}
-      {page === 'live-waiting' && <LiveWaitingPage pin={livePin} quiz={activeQuiz} onStart={() => setPage('play')} />}
+      {page === 'live-waiting' && <LiveWaitingPage pin={livePin} quiz={activeQuiz} participants={liveParticipants} onStart={() => setPage('play')} />}
       {page === 'editor' && <EditorPage quiz={activeQuiz} onNavigate={setPage} onSaveQuiz={handleSaveQuiz} />}
-      {page === 'play' && <PlayPage quiz={activeQuiz} onNavigate={setPage} participantName={participantName} />}
-      {page === 'result' && <ResultPage onNavigate={setPage} />}
+      {page === 'play' && <PlayPage quiz={activeQuiz} onNavigate={setPage} participantName={participantName} onSubmitAnswer={handleSubmitAnswer} />}
+      {page === 'result' && <ResultPage onNavigate={setPage} leaderboard={leaderboard} />}
       {showCreateModal && <CreateQuizModal onClose={() => setShowCreateModal(false)} onSubmit={handleCreateQuiz} />}
       {assigningQuiz && <AssignQuizModal quiz={assigningQuiz} onClose={() => setAssigningQuizId('')} onSubmit={handleCreateAssignment} />}
     </>
