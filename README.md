@@ -33,4 +33,4 @@ npm install
 npm run dev
 ```
 
-Buka alamat yang ditampilkan Vite, biasanya `http://localhost:5173`.
+Buka alamat yang ditampilkan Vite `http://localhost:5173`.
