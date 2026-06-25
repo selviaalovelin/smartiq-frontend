@@ -285,7 +285,6 @@ function AuthPage({ mode, onNavigate, onAuthenticate }) {
   const [form, setForm] = useState({ email: '', password: '', confirmPassword: '' });
   const [submitted, setSubmitted] = useState(false);
   const [touched, setTouched] = useState({});
-  const [saveError, setSaveError] = useState('');
   const [serverError, setServerError] = useState('');
 
   const errors = {
@@ -668,6 +667,7 @@ function EditorPage({ quiz, onNavigate, onSaveQuiz }) {
   const [showProperties, setShowProperties] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [touched, setTouched] = useState({});
+  const [saveError, setSaveError] = useState('');
   const activeQuestion = questions[activeQuestionIndex] || questions[0];
 
   const titleError = (submitted || touched.title) && !title.trim() ? 'Judul kuis wajib diisi.' : '';
