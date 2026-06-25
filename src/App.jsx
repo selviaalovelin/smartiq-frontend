@@ -50,6 +50,8 @@ const normalizeBackendQuiz = (quiz) => ({
     title: quiz.title,
     category: quiz.category || 'Layanan Web',
     pin: quiz.pin,
+    status: quiz.status || 'draft',
+    createdAt: quiz.created_at || quiz.createdAt || '',
     questions: (quiz.questions || []).map((question) => ({
       id: String(question.id),
       text: question.text,
@@ -62,12 +64,14 @@ const normalizeBackendQuiz = (quiz) => ({
 
 const normalizeBackendAssignment = (assignment) => {
   const deadline = new Date(assignment.deadline);
+  const createdAt = new Date(assignment.created_at);
   const quiz = assignment.quiz || {};
 
   return {
     id: String(assignment.id),
     quizId: String(assignment.quiz_id),
     title: quiz.title || 'Kuis',
+    startDate: Number.isNaN(createdAt.valueOf()) ? '-' : createdAt.toLocaleDateString('id-ID'),
     endDate: Number.isNaN(deadline.valueOf()) ? assignment.deadline : deadline.toLocaleDateString('id-ID'),
     endTime: Number.isNaN(deadline.valueOf()) ? '' : deadline.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
     host: assignment.host || 'Pengajar',
@@ -77,17 +81,22 @@ const normalizeBackendAssignment = (assignment) => {
 };
 
 async function requestJson(path, options = {}) {
+  const session = JSON.parse(window.localStorage.getItem('smartq-session') || 'null');
   const response = await fetch(path, {
     headers: {
       Accept: 'application/json',
       'Content-Type': 'application/json',
+      ...(session?.token ? { Authorization: `Bearer ${session.token}` } : {}),
       ...options.headers,
     },
     ...options,
   });
 
   if (!response.ok) {
-    throw new Error(`Request gagal: ${response.status}`);
+    const payload = await response.json().catch(() => null);
+    const error = new Error(payload?.message || `Request gagal: ${response.status}`);
+    error.status = response.status;
+    throw error;
   }
 
   if (response.status === 204) {
@@ -120,7 +129,7 @@ const monthNames = [
   'November',
   'Desember',
 ];
-const yearOptions = Array.from({ length: 7 }, (_, index) => 2026 + index);
+const yearOptions = Array.from({ length: 7 }, (_, index) => new Date().getFullYear() + index);
 const dayOptions = Array.from({ length: 31 }, (_, index) => index + 1);
 const hourOptions = Array.from({ length: 24 }, (_, index) => `${String(index).padStart(2, '0')}:00`);
 
@@ -172,6 +181,7 @@ function HomePage({ onNavigate, onJoin }) {
             value={pin}
             onChange={(event) => {
               setPin(event.target.value.replace(/\D/g, '').slice(0, 6));
+              setServerError('');
               if (submitted) {
                 setSubmitted(false);
               }
@@ -221,6 +231,7 @@ function ParticipantNamePage({ onStart }) {
             value={nickname}
             onChange={(event) => {
               setNickname(event.target.value);
+              setServerError('');
               if (submitted) {
                 setSubmitted(false);
               }
@@ -237,10 +248,25 @@ function ParticipantNamePage({ onStart }) {
 }
 
 function ParticipantWaitingPage({ pin, participantName, onReady }) {
+  const [message, setMessage] = useState('');
+
   useEffect(() => {
-    const timer = window.setTimeout(onReady, 2400);
-    return () => window.clearTimeout(timer);
-  }, [onReady]);
+    const checkQuizStatus = async () => {
+      try {
+        const payload = await requestJson(`/api/quizzes/pin/${pin}`);
+        setMessage('');
+        if (payload?.data?.status === 'started') {
+          onReady();
+        }
+      } catch {
+        setMessage('Koneksi terputus. Sistem akan mencoba kembali.');
+      }
+    };
+
+    checkQuizStatus();
+    const timer = window.setInterval(checkQuizStatus, 2000);
+    return () => window.clearInterval(timer);
+  }, [pin, onReady]);
 
   return (
     <section className="page live-page live-wait-page">
@@ -248,6 +274,7 @@ function ParticipantWaitingPage({ pin, participantName, onReady }) {
         <p>Anda sudah masuk, tunggu penyelenggara kuis memulai kuis!</p>
         <strong>{participantName || 'Peserta'}</strong>
         <span>PIN {pin || '109276'}</span>
+        {message && <FieldError message={message} />}
       </div>
     </section>
   );
@@ -258,6 +285,7 @@ function AuthPage({ mode, onNavigate, onAuthenticate }) {
   const [form, setForm] = useState({ email: '', password: '', confirmPassword: '' });
   const [submitted, setSubmitted] = useState(false);
   const [touched, setTouched] = useState({});
+  const [saveError, setSaveError] = useState('');
   const [serverError, setServerError] = useState('');
 
   const errors = {
@@ -285,6 +313,7 @@ function AuthPage({ mode, onNavigate, onAuthenticate }) {
 
   const updateField = (field, value) => {
     setForm((current) => ({ ...current, [field]: value }));
+    setServerError('');
   };
 
   const handleSubmit = async (event) => {
@@ -359,13 +388,15 @@ function AuthPage({ mode, onNavigate, onAuthenticate }) {
   );
 }
 
-function DashboardPage({ quizzes, assignments, activePanel, setActivePanel, onCreate, onEdit, onStartLive, onAssign, onDelete }) {
+function DashboardPage({ quizzes, assignments, activePanel, setActivePanel, onCreate, onEdit, onStartLive, onAssign, onDelete, onLogout }) {
   const [keyword, setKeyword] = useState('');
   const [openMenuId, setOpenMenuId] = useState('');
   const [copiedValue, setCopiedValue] = useState('');
 
   const totalQuestions = quizzes.reduce((total, quiz) => total + quiz.questions.length, 0);
-  const finishedReports = quizzes.filter((quiz) => quiz.questions.length > 0).length;
+  const today = new Date().toDateString();
+  const createdToday = quizzes.filter((quiz) => quiz.createdAt && new Date(quiz.createdAt).toDateString() === today).length;
+  const finishedReports = assignments.length;
   const filteredQuizzes = quizzes.filter((quiz) => quiz.title.toLowerCase().includes(keyword.toLowerCase()));
 
   const groupedReports = useMemo(() => {
@@ -403,7 +434,9 @@ function DashboardPage({ quizzes, assignments, activePanel, setActivePanel, onCr
         <Brand />
         <div className="dashboard-actions">
           <button className="create-button" type="button" onClick={onCreate}>Buat Kuis</button>
-          <FaUserCircle className="profile-icon" aria-label="Profil pengajar" />
+          <button className="profile-button" type="button" onClick={onLogout} title="Keluar dari akun" aria-label="Keluar dari akun">
+            <FaUserCircle className="profile-icon" />
+          </button>
         </div>
       </header>
 
@@ -426,7 +459,7 @@ function DashboardPage({ quizzes, assignments, activePanel, setActivePanel, onCr
                 <button className="stat-card" type="button" onClick={() => setActivePanel('pustaka')}>
                   <h2>Dibuat Hari Ini</h2>
                   <FaPencilAlt className="stat-icon" />
-                  <strong>{finishedReports} Soal</strong>
+                  <strong>{createdToday} Soal</strong>
                 </button>
                 <button className="stat-card" type="button" onClick={() => setActivePanel('laporan')}>
                   <h2>Laporan Selesai</h2>
@@ -468,6 +501,13 @@ function DashboardPage({ quizzes, assignments, activePanel, setActivePanel, onCr
 
           {activePanel === 'laporan' && (
             <div className="report-grid">
+              {Object.entries(groupedReports).map(([category, count]) => (
+                <article className="report-card" key={category}>
+                  <h3>{category}</h3>
+                  <strong>{count ? `${count} Soal Tersedia` : 'Belum Tersedia Soal'}</strong>
+                  <button type="button" onClick={() => setActivePanel('pustaka')}>Lihat Selengkapnya</button>
+                </article>
+              ))}
               {assignments.map((assignment) => (
                 <article className="assignment-report-card" key={assignment.id}>
                   <div>
@@ -481,13 +521,6 @@ function DashboardPage({ quizzes, assignments, activePanel, setActivePanel, onCr
                     <div><dt>Pin game:</dt><dd>{assignment.pin}</dd><button type="button" onClick={() => copyText(assignment.pin)}>{copiedValue === assignment.pin ? 'Tersalin' : 'Salin'}</button></div>
                     <div><dt>URL:</dt><dd>{assignment.url}</dd><button type="button" onClick={() => copyText(assignment.url)}>{copiedValue === assignment.url ? 'Tersalin' : 'Salin'}</button></div>
                   </dl>
-                </article>
-              ))}
-              {!assignments.length && Object.entries(groupedReports).map(([category, count]) => (
-                <article className="report-card" key={category}>
-                  <h3>{category}</h3>
-                  <strong>{count ? `${count} Soal Tersedia` : 'Belum Tersedia Soal'}</strong>
-                  <button type="button" onClick={() => setActivePanel('pustaka')}>Lihat Selengkapnya</button>
                 </article>
               ))}
             </div>
@@ -510,19 +543,23 @@ function CreateQuizModal({ onClose, onSubmit }) {
   const [category, setCategory] = useState('');
   const [newCategory, setNewCategory] = useState('');
   const [submitted, setSubmitted] = useState(false);
+  const [serverError, setServerError] = useState('');
   const hasCategory = Boolean(category || newCategory.trim());
   const canSubmit = hasCategory;
   const categoryError = submitted && !hasCategory ? 'Kategori kuis wajib dipilih atau ditambahkan.' : '';
 
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault();
     setSubmitted(true);
     if (!canSubmit) {
       return;
     }
-    onSubmit({
+    const created = await onSubmit({
       category: newCategory.trim() || category,
     });
+    if (!created) {
+      setServerError('Kuis belum berhasil dibuat. Periksa koneksi backend.');
+    }
   };
 
   return (
@@ -539,6 +576,7 @@ function CreateQuizModal({ onClose, onSubmit }) {
           <button className="add-category-button" type="button" onClick={() => setCategory('')} aria-label="Tambah kategori"><FaPlus /></button>
         </div>
         <FieldError message={categoryError} />
+        <FieldError message={serverError} />
         <button className={!canSubmit ? 'is-disabled' : ''} type="submit">Lanjutkan membuat soal <FaArrowRight /></button>
         <button className="modal-close" type="button" onClick={onClose}>Batalkan</button>
       </form>
@@ -547,12 +585,19 @@ function CreateQuizModal({ onClose, onSubmit }) {
 }
 
 function AssignQuizModal({ quiz, onClose, onSubmit }) {
-  const [deadline, setDeadline] = useState({
-    day: 26,
-    month: 4,
-    year: 2026,
-    hour: '23:00',
-  });
+  const initialDeadline = useMemo(() => {
+    const value = new Date();
+    value.setDate(value.getDate() + 1);
+    value.setMinutes(0, 0, 0);
+    return {
+      day: value.getDate(),
+      month: value.getMonth() + 1,
+      year: value.getFullYear(),
+      hour: `${String(value.getHours()).padStart(2, '0')}:00`,
+    };
+  }, []);
+  const [deadline, setDeadline] = useState(initialDeadline);
+  const [error, setError] = useState('');
 
   const updateDeadline = (field, value) => {
     setDeadline((current) => ({
@@ -561,13 +606,21 @@ function AssignQuizModal({ quiz, onClose, onSubmit }) {
     }));
   };
 
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault();
     const deadlineDate = new Date(deadline.year, deadline.month - 1, deadline.day, Number(deadline.hour.slice(0, 2)));
-    onSubmit({
+    if (deadlineDate <= new Date()) {
+      setError('Batas waktu harus lebih besar dari waktu sekarang.');
+      return;
+    }
+    setError('');
+    const created = await onSubmit({
       quizId: quiz.id,
       deadline: deadlineDate.toISOString(),
     });
+    if (!created) {
+      setError('Tugas belum berhasil dibuat. Periksa batas waktu atau koneksi backend.');
+    }
   };
 
   return (
@@ -596,6 +649,7 @@ function AssignQuizModal({ quiz, onClose, onSubmit }) {
             </select>
           </label>
         </div>
+        <FieldError message={error} />
         <div className="assignment-actions">
           <button className="assignment-cancel" type="button" onClick={onClose}>Batal</button>
           <button className="assignment-submit" type="submit">Buat</button>
@@ -659,13 +713,13 @@ function EditorPage({ quiz, onNavigate, onSaveQuiz }) {
     setSubmitted(false);
   };
 
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault();
     setSubmitted(true);
     if (!canSave) {
       return;
     }
-    onSaveQuiz(quiz.id, {
+    const saved = await onSaveQuiz(quiz.id, {
       title: title.trim(),
       questions: questions.map((item) => ({
         text: item.text.trim(),
@@ -675,7 +729,11 @@ function EditorPage({ quiz, onNavigate, onSaveQuiz }) {
         timeLimit: Number(item.timeLimit) || 10,
       })),
     });
-    onNavigate('dashboard');
+    if (saved) {
+      onNavigate('dashboard');
+    } else {
+      setSaveError('Kuis belum berhasil disimpan. Periksa koneksi backend.');
+    }
   };
 
   return (
@@ -696,6 +754,7 @@ function EditorPage({ quiz, onNavigate, onSaveQuiz }) {
           </div>
           <button className="secondary-button" type="button" onClick={() => onNavigate('dashboard')}>Batal</button>
           <button className={`save-button ${!canSave ? 'is-disabled' : ''}`} type="submit">Simpan</button>
+          <FieldError message={saveError} />
         </header>
 
         <div className="editor-body">
@@ -805,12 +864,12 @@ function LiveWaitingPage({ pin, quiz, participants, onStart }) {
         {!participants.length && <p className="live-question-count">Belum ada peserta yang masuk.</p>}
       </div>
       <p className="live-question-count">{quiz.questions.length || 1} pertanyaan siap</p>
-      <button className="live-start-button" type="button" onClick={onStart}>Mulai</button>
+      <button className={`live-start-button ${!participants.length ? 'is-disabled' : ''}`} type="button" onClick={onStart}>Mulai</button>
     </section>
   );
 }
 
-function PlayPage({ quiz, onNavigate, participantName, onSubmitAnswer }) {
+function PlayPage({ quiz, onComplete, participantName, onSubmitAnswer }) {
   const fallback = starterQuizzes[0].questions[0];
   const quizQuestions = quiz?.questions.length ? quiz.questions : [fallback];
   const [activeQuestionIndex, setActiveQuestionIndex] = useState(0);
@@ -858,7 +917,7 @@ function PlayPage({ quiz, onNavigate, participantName, onSubmitAnswer }) {
       return;
     }
 
-    onNavigate('result');
+    onComplete();
   };
 
   const handleSelectAnswer = async (option) => {
@@ -880,7 +939,7 @@ function PlayPage({ quiz, onNavigate, participantName, onSubmitAnswer }) {
 
   return (
     <section className="page play-page classroom-scene">
-      <button className="result-shortcut" type="button" onClick={() => onNavigate('result')}>Lihat Hasil</button>
+      <button className="result-shortcut" type="button" onClick={onComplete}>Lihat Hasil</button>
       {showIntro ? (
         <div className="question-intro">Pertanyaan {activeQuestionIndex + 1}...</div>
       ) : (
@@ -941,9 +1000,9 @@ function ResultPage({ onNavigate, leaderboard }) {
 
 export default function App() {
   const [page, setPage] = useState('home');
-  const [quizzes, setQuizzes] = useState(starterQuizzes);
+  const [quizzes, setQuizzes] = useState([]);
   const [activePanel, setActivePanel] = useState('beranda');
-  const [activeQuizId, setActiveQuizId] = useState(starterQuizzes[0].id);
+  const [activeQuizId, setActiveQuizId] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [assigningQuizId, setAssigningQuizId] = useState('');
   const [assignments, setAssignments] = useState([]);
@@ -953,12 +1012,19 @@ export default function App() {
   const [livePin, setLivePin] = useState('');
   const [liveParticipants, setLiveParticipants] = useState([]);
   const [leaderboard, setLeaderboard] = useState([]);
-  const [currentUser, setCurrentUser] = useState(null);
+  const [currentUser, setCurrentUser] = useState(() => JSON.parse(window.localStorage.getItem('smartq-session') || 'null'));
+  const [quizRole, setQuizRole] = useState('');
 
   const activeQuiz = quizzes.find((quiz) => quiz.id === activeQuizId) || quizzes[0];
   const assigningQuiz = quizzes.find((quiz) => quiz.id === assigningQuizId);
 
   useEffect(() => {
+    if (!currentUser) {
+      setQuizzes([]);
+      setAssignments([]);
+      return undefined;
+    }
+
     let isMounted = true;
 
     const loadQuizzes = async () => {
@@ -982,7 +1048,12 @@ export default function App() {
             : String(backendQuizzes[0].id)
         ));
       } catch (error) {
-        console.info('Backend kuis belum tersedia, memakai data lokal.', error);
+        console.info('Data kuis belum dapat dimuat.', error);
+        if (error.status === 401) {
+          window.localStorage.removeItem('smartq-session');
+          setCurrentUser(null);
+          setPage('login');
+        }
       }
     };
 
@@ -995,7 +1066,7 @@ export default function App() {
           setAssignments((payload.data || []).map(normalizeBackendAssignment));
         }
       } catch (error) {
-        console.info('Backend tugas belum tersedia.', error);
+        console.info('Data tugas belum dapat dimuat.', error);
       }
     };
 
@@ -1004,19 +1075,27 @@ export default function App() {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [currentUser]);
+
+  const handleAuthenticate = (user) => {
+    window.localStorage.setItem('smartq-session', JSON.stringify(user));
+    setCurrentUser(user);
+  };
+
+  const handleLogout = async () => {
+    try {
+      await requestJson('/api/auth/logout', { method: 'POST' });
+    } catch {
+      // Sesi lokal tetap dibersihkan saat server tidak dapat dijangkau.
+    }
+    window.localStorage.removeItem('smartq-session');
+    setCurrentUser(null);
+    setActiveQuizId('');
+    setPage('home');
+  };
 
   const handleCreateQuiz = async ({ title, category }) => {
     const quizTitle = title || `Soal Quiz ${quizzes.length + 1}`;
-    const localQuiz = {
-      id: `quiz-${Date.now()}`,
-      title: quizTitle,
-      category,
-      questions: [],
-    };
-
-    let quiz = localQuiz;
-
     try {
       const payload = await requestJson('/api/quizzes', {
         method: 'POST',
@@ -1026,17 +1105,16 @@ export default function App() {
         }),
       });
 
-      if (payload?.data) {
-        quiz = normalizeBackendQuiz(payload.data);
-      }
+      const quiz = normalizeBackendQuiz(payload.data);
+      setQuizzes((current) => [quiz, ...current]);
+      setActiveQuizId(quiz.id);
+      setShowCreateModal(false);
+      setPage('editor');
+      return true;
     } catch (error) {
-      console.info('Kuis disimpan lokal karena backend belum tersedia.', error);
+      console.info('Kuis belum berhasil dibuat.', error);
+      return false;
     }
-
-    setQuizzes((current) => [quiz, ...current]);
-    setActiveQuizId(quiz.id);
-    setShowCreateModal(false);
-    setPage('editor');
   };
 
   const handleEditQuiz = (id) => {
@@ -1045,17 +1123,22 @@ export default function App() {
   };
 
   const handleStartLive = async (id) => {
-    const quiz = quizzes.find((item) => item.id === id);
     setActiveQuizId(id);
-    setLivePin(quiz?.pin || '');
+    setParticipantId('');
+    setParticipantName('');
+    setQuizRole('host');
     try {
+      const opened = await requestJson(`/api/quizzes/${id}/open`, { method: 'PUT' });
+      const openedQuiz = normalizeBackendQuiz(opened.data);
+      setQuizzes((current) => current.map((item) => item.id === id ? openedQuiz : item));
+      setLivePin(openedQuiz.pin || '');
       const payload = await requestJson(`/api/quizzes/${id}/participants`);
       setLiveParticipants(payload.data || []);
+      setPage('live-creating');
     } catch (error) {
-      console.info('Peserta live belum dapat dimuat.', error);
+      console.info('Ruang live belum dapat dibuka.', error);
       setLiveParticipants([]);
     }
-    setPage('live-creating');
   };
 
   const handleAssignQuiz = (id) => {
@@ -1075,19 +1158,26 @@ export default function App() {
       setAssignments((current) => [normalizeBackendAssignment(payload.data), ...current]);
       setAssigningQuizId('');
       setActivePanel('laporan');
+      return true;
     } catch (error) {
       console.info('Tugas belum dapat disimpan ke backend.', error);
+      return false;
     }
   };
 
   const handleDeleteQuiz = async (id) => {
+    if (!window.confirm('Hapus kuis ini beserta seluruh soal dan hasilnya?')) {
+      return;
+    }
+
     if (isBackendId(id)) {
       try {
         await requestJson(`/api/quizzes/${id}`, {
           method: 'DELETE',
         });
       } catch (error) {
-        console.info('Kuis dihapus lokal karena backend belum tersedia.', error);
+        console.info('Kuis belum berhasil dihapus.', error);
+        return;
       }
     }
 
@@ -1095,7 +1185,7 @@ export default function App() {
       const nextQuizzes = current.filter((quiz) => quiz.id !== id);
 
       if (activeQuizId === id) {
-        setActiveQuizId(nextQuizzes[0]?.id || starterQuizzes[0].id);
+        setActiveQuizId(nextQuizzes[0]?.id || '');
       }
 
       return nextQuizzes;
@@ -1109,6 +1199,7 @@ export default function App() {
       setQuizzes((current) => [quiz, ...current.filter((item) => item.id !== quiz.id)]);
       setActiveQuizId(quiz.id);
       setParticipantPin(pin);
+      setQuizRole('participant');
       setPage('participant-name');
       return { ok: true };
     } catch (error) {
@@ -1152,23 +1243,38 @@ export default function App() {
         });
         const savedQuiz = normalizeBackendQuiz(response.data);
         setQuizzes((current) => current.map((quiz) => (quiz.id === quizId ? savedQuiz : quiz)));
-        return;
+        return true;
       } catch (error) {
-        console.info('Perubahan metadata kuis disimpan lokal karena backend belum tersedia.', error);
+        console.info('Perubahan kuis belum berhasil disimpan.', error);
+        return false;
       }
     }
+    return false;
+  };
 
-    setQuizzes((current) => current.map((quiz) => {
-      if (quiz.id !== quizId) {
-        return quiz;
+  const handleHostStart = async () => {
+    if (!liveParticipants.length) {
+      return;
+    }
+    try {
+      const payload = await requestJson(`/api/quizzes/${activeQuizId}/start`, { method: 'PUT' });
+      const startedQuiz = normalizeBackendQuiz(payload.data);
+      setQuizzes((current) => current.map((quiz) => quiz.id === activeQuizId ? startedQuiz : quiz));
+      setPage('play');
+    } catch (error) {
+      console.info('Kuis belum berhasil dimulai.', error);
+    }
+  };
+
+  const handleCompleteQuiz = async () => {
+    if (quizRole === 'host' && isBackendId(activeQuizId)) {
+      try {
+        await requestJson(`/api/quizzes/${activeQuizId}/finish`, { method: 'PUT' });
+      } catch (error) {
+        console.info('Status selesai belum dapat disimpan.', error);
       }
-
-      return {
-        ...quiz,
-        title: payload.title || quiz.title,
-        questions: payload.questions,
-      };
-    }));
+    }
+    setPage('result');
   };
 
   const handleSubmitAnswer = async (questionId, selectedOption) => {
@@ -1217,10 +1323,15 @@ export default function App() {
 
   return (
     <>
-      {page === 'home' && <HomePage onNavigate={setPage} onJoin={handleJoinQuiz} />}
+      {page === 'home' && (
+        <HomePage
+          onNavigate={(target) => setPage(target === 'login' && currentUser ? 'dashboard' : target)}
+          onJoin={handleJoinQuiz}
+        />
+      )}
       {page === 'participant-name' && <ParticipantNamePage pin={participantPin} onStart={handleStartQuiz} />}
-      {page === 'login' && <AuthPage mode="login" onNavigate={setPage} onAuthenticate={setCurrentUser} />}
-      {page === 'register' && <AuthPage mode="register" onNavigate={setPage} onAuthenticate={setCurrentUser} />}
+      {page === 'login' && <AuthPage mode="login" onNavigate={setPage} onAuthenticate={handleAuthenticate} />}
+      {page === 'register' && <AuthPage mode="register" onNavigate={setPage} onAuthenticate={handleAuthenticate} />}
       {page === 'dashboard' && (
         <DashboardPage
           quizzes={quizzes}
@@ -1232,13 +1343,14 @@ export default function App() {
           onStartLive={handleStartLive}
           onAssign={handleAssignQuiz}
           onDelete={handleDeleteQuiz}
+          onLogout={handleLogout}
         />
       )}
       {page === 'participant-waiting' && <ParticipantWaitingPage pin={participantPin} participantName={participantName} onReady={() => setPage('play')} />}
       {page === 'live-creating' && <LiveCreatingPage onDone={() => setPage('live-waiting')} />}
-      {page === 'live-waiting' && <LiveWaitingPage pin={livePin} quiz={activeQuiz} participants={liveParticipants} onStart={() => setPage('play')} />}
+      {page === 'live-waiting' && <LiveWaitingPage pin={livePin} quiz={activeQuiz} participants={liveParticipants} onStart={handleHostStart} />}
       {page === 'editor' && <EditorPage quiz={activeQuiz} onNavigate={setPage} onSaveQuiz={handleSaveQuiz} />}
-      {page === 'play' && <PlayPage quiz={activeQuiz} onNavigate={setPage} participantName={participantName} onSubmitAnswer={handleSubmitAnswer} />}
+      {page === 'play' && <PlayPage quiz={activeQuiz} onComplete={handleCompleteQuiz} participantName={participantName} onSubmitAnswer={handleSubmitAnswer} />}
       {page === 'result' && <ResultPage onNavigate={setPage} leaderboard={leaderboard} />}
       {showCreateModal && <CreateQuizModal onClose={() => setShowCreateModal(false)} onSubmit={handleCreateQuiz} />}
       {assigningQuiz && <AssignQuizModal quiz={assigningQuiz} onClose={() => setAssigningQuizId('')} onSubmit={handleCreateAssignment} />}
