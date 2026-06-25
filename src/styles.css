@@ -10,9 +10,9 @@
   --ink: #171717;
   --font-ui: "Baloo 2", "Trebuchet MS", Arial, sans-serif;
   --font-brand: "Bangers", "Baloo 2", cursive;
-  --bg-login: url("/backgrounds/kelas-login.jpeg");
-  --bg-board: url("/backgrounds/kelas-3.avif");
-  --bg-editor: url("/backgrounds/kelas-2.avif");
+  --bg-login: url("/backgrounds/kelas-hd.png");
+  --bg-board: url("/backgrounds/kelas-hd.png");
+  --bg-editor: url("/backgrounds/kelas-hd.png");
 }
 
 * {
@@ -336,6 +336,16 @@ button:disabled {
   display: flex;
   align-items: center;
   gap: 22px;
+}
+
+.profile-button {
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
 }
 
 .create-button {
@@ -799,14 +809,14 @@ button:disabled {
   position: relative;
   min-height: 100vh;
   background:
-    linear-gradient(rgba(18, 43, 63, .48), rgba(18, 43, 63, .48)),
+    linear-gradient(rgba(18, 43, 63, .25), rgba(18, 43, 63, .25)),
     var(--bg-board) center / cover no-repeat;
   overflow: hidden;
 }
 
 .editor-page.classroom-page {
   background:
-    linear-gradient(rgba(18, 43, 63, .42), rgba(18, 43, 63, .42)),
+    linear-gradient(rgba(18, 43, 63, .2), rgba(18, 43, 63, .2)),
     var(--bg-editor) center / cover no-repeat;
 }
 
@@ -819,7 +829,7 @@ button:disabled {
 
 .classroom-scene::before {
   inset: 0;
-  background: rgba(15, 49, 76, .22);
+  background: rgba(15, 49, 76, .08);
 }
 
 .classroom-scene::after {
@@ -828,12 +838,12 @@ button:disabled {
 
 .participant-login.classroom-scene {
   background:
-    linear-gradient(rgba(13, 49, 75, .56), rgba(13, 49, 75, .56)),
+    linear-gradient(rgba(13, 49, 75, .25), rgba(13, 49, 75, .25)),
     var(--bg-login) center / cover no-repeat;
 }
 
 .participant-login.classroom-scene::before {
-  background: rgba(11, 50, 78, .16);
+  background: rgba(11, 50, 78, .06);
 }
 
 .participant-login.classroom-scene::after {
@@ -1147,7 +1157,7 @@ button:disabled {
   place-items: center;
   overflow: hidden;
   background:
-    linear-gradient(rgba(17, 50, 78, .56), rgba(17, 50, 78, .56)),
+    linear-gradient(rgba(17, 50, 78, .25), rgba(17, 50, 78, .25)),
     var(--bg-editor) center / cover no-repeat;
 }
 
