@@ -557,8 +557,8 @@ function CreateQuizModal({ onClose, onSubmit }) {
     const created = await onSubmit({
       category: newCategory.trim() || category,
     });
-    if (!created) {
-      setServerError('Kuis belum berhasil dibuat. Periksa koneksi backend.');
+    if (!created?.ok) {
+      setServerError(created?.message || 'Kuis belum berhasil dibuat. Periksa koneksi backend.');
     }
   };
 
@@ -1094,6 +1094,14 @@ export default function App() {
     setPage('home');
   };
 
+  const clearExpiredSession = () => {
+    window.localStorage.removeItem('smartq-session');
+    setCurrentUser(null);
+    setActiveQuizId('');
+    setShowCreateModal(false);
+    setPage('login');
+  };
+
   const handleCreateQuiz = async ({ title, category }) => {
     const quizTitle = title || `Soal Quiz ${quizzes.length + 1}`;
     try {
@@ -1110,10 +1118,14 @@ export default function App() {
       setActiveQuizId(quiz.id);
       setShowCreateModal(false);
       setPage('editor');
-      return true;
+      return { ok: true };
     } catch (error) {
       console.info('Kuis belum berhasil dibuat.', error);
-      return false;
+      if (error.status === 401) {
+        clearExpiredSession();
+        return { ok: false, message: 'Sesi sudah berakhir. Silakan masuk kembali.' };
+      }
+      return { ok: false, message: error.message || 'Kuis belum berhasil dibuat.' };
     }
   };
 
@@ -1349,7 +1361,15 @@ export default function App() {
       {page === 'participant-waiting' && <ParticipantWaitingPage pin={participantPin} participantName={participantName} onReady={() => setPage('play')} />}
       {page === 'live-creating' && <LiveCreatingPage onDone={() => setPage('live-waiting')} />}
       {page === 'live-waiting' && <LiveWaitingPage pin={livePin} quiz={activeQuiz} participants={liveParticipants} onStart={handleHostStart} />}
-      {page === 'editor' && <EditorPage quiz={activeQuiz} onNavigate={setPage} onSaveQuiz={handleSaveQuiz} />}
+      {page === 'editor' && activeQuiz && <EditorPage quiz={activeQuiz} onNavigate={setPage} onSaveQuiz={handleSaveQuiz} />}
+      {page === 'editor' && !activeQuiz && (
+        <section className="page blue-page editor-loading-page">
+          <div className="editor-loading-card">
+            <p>Data kuis belum tersedia.</p>
+            <button type="button" onClick={() => setPage(currentUser ? 'dashboard' : 'login')}>Kembali</button>
+          </div>
+        </section>
+      )}
       {page === 'play' && <PlayPage quiz={activeQuiz} onComplete={handleCompleteQuiz} participantName={participantName} onSubmitAnswer={handleSubmitAnswer} />}
       {page === 'result' && <ResultPage onNavigate={setPage} leaderboard={leaderboard} />}
       {showCreateModal && <CreateQuizModal onClose={() => setShowCreateModal(false)} onSubmit={handleCreateQuiz} />}
