@@ -115,6 +115,15 @@ function Brand() {
 }
 
 const isEmailValid = (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+const PIN_LENGTH = 6;
+const MAX_EMAIL_LENGTH = 150;
+const MAX_PASSWORD_LENGTH = 100;
+const MAX_NAME_LENGTH = 100;
+const MAX_TITLE_LENGTH = 150;
+const MAX_CATEGORY_LENGTH = 100;
+const MAX_IMAGE_SIZE = 2 * 1024 * 1024;
+const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+const isPinValid = (value) => new RegExp(`^\\d{${PIN_LENGTH}}$`).test(value);
 const monthNames = [
   'Januari',
   'Februari',
@@ -148,15 +157,15 @@ function HomePage({ onNavigate, onJoin }) {
   const pinError = submitted
     ? !pin.trim()
       ? 'PIN soal wajib diisi.'
-      : pin.length < 4
-        ? 'PIN minimal 4 digit.'
+      : !isPinValid(pin)
+        ? `PIN harus ${PIN_LENGTH} digit angka.`
         : ''
     : '';
 
   const handlePin = async (event) => {
     event.preventDefault();
     setSubmitted(true);
-    if (!pin.trim() || pin.length < 4) {
+    if (!isPinValid(pin)) {
       return;
     }
 
@@ -177,10 +186,10 @@ function HomePage({ onNavigate, onJoin }) {
         <Brand />
         <form className="pin-card" onSubmit={handlePin} noValidate>
           <input
-            className={pinError ? 'input-error' : ''}
+            className={pinError || serverError ? 'input-error' : ''}
             value={pin}
             onChange={(event) => {
-              setPin(event.target.value.replace(/\D/g, '').slice(0, 6));
+              setPin(event.target.value.slice(0, PIN_LENGTH));
               setServerError('');
               if (submitted) {
                 setSubmitted(false);
@@ -188,10 +197,11 @@ function HomePage({ onNavigate, onJoin }) {
             }}
             placeholder="Pin Soal"
             inputMode="numeric"
+            maxLength={PIN_LENGTH}
           />
           <FieldError message={pinError} />
           <FieldError message={serverError} />
-          <button className={pin.length < 4 ? 'is-disabled' : ''} type="submit">Masuk</button>
+          <button className={!isPinValid(pin) ? 'is-disabled' : ''} disabled={!isPinValid(pin)} type="submit">Masuk</button>
         </form>
       </div>
     </section>
@@ -206,13 +216,15 @@ function ParticipantNamePage({ onStart }) {
   const nameError = submitted
     ? !nickname.trim()
       ? 'Nama panggilan wajib diisi.'
-      : ''
+      : nickname.trim().length > MAX_NAME_LENGTH
+        ? `Nama panggilan maksimal ${MAX_NAME_LENGTH} karakter.`
+        : ''
     : '';
 
   const handleJoin = async (event) => {
     event.preventDefault();
     setSubmitted(true);
-    if (!nickname.trim()) {
+    if (!nickname.trim() || nickname.trim().length > MAX_NAME_LENGTH) {
       return;
     }
     const result = await onStart(nickname.trim());
@@ -230,7 +242,7 @@ function ParticipantNamePage({ onStart }) {
             className={nameError ? 'input-error' : ''}
             value={nickname}
             onChange={(event) => {
-              setNickname(event.target.value);
+              setNickname(event.target.value.slice(0, MAX_NAME_LENGTH));
               setServerError('');
               if (submitted) {
                 setSubmitted(false);
@@ -240,7 +252,7 @@ function ParticipantNamePage({ onStart }) {
           />
           <FieldError message={nameError} />
           <FieldError message={serverError} />
-          <button className={!nickname.trim() ? 'is-disabled' : ''} type="submit">Oke, Mulai!</button>
+          <button className={!nickname.trim() ? 'is-disabled' : ''} disabled={!nickname.trim()} type="submit">Oke, Mulai!</button>
         </form>
       </div>
     </section>
@@ -292,12 +304,16 @@ function AuthPage({ mode, onNavigate, onAuthenticate }) {
       ? 'Email wajib diisi.'
       : !isEmailValid(form.email)
         ? 'Format email belum benar.'
-        : '',
+        : form.email.length > MAX_EMAIL_LENGTH
+          ? `Email maksimal ${MAX_EMAIL_LENGTH} karakter.`
+          : '',
     password: !form.password
       ? 'Kata sandi wajib diisi.'
-      : isRegister && form.password.length < 8
+      : form.password.length < 8
         ? 'Kata sandi minimal 8 karakter.'
-        : '',
+        : form.password.length > MAX_PASSWORD_LENGTH
+          ? `Kata sandi maksimal ${MAX_PASSWORD_LENGTH} karakter.`
+          : '',
     confirmPassword: isRegister
       ? !form.confirmPassword
         ? 'Konfirmasi kata sandi wajib diisi.'
@@ -342,6 +358,7 @@ function AuthPage({ mode, onNavigate, onAuthenticate }) {
           type="email"
           value={form.email}
           onBlur={() => setTouched((current) => ({ ...current, email: true }))}
+          maxLength={MAX_EMAIL_LENGTH}
           onChange={(event) => updateField('email', event.target.value)}
           placeholder="Masukkan Email Anda"
         />
@@ -353,6 +370,7 @@ function AuthPage({ mode, onNavigate, onAuthenticate }) {
           type="password"
           value={form.password}
           onBlur={() => setTouched((current) => ({ ...current, password: true }))}
+          maxLength={MAX_PASSWORD_LENGTH}
           onChange={(event) => updateField('password', event.target.value)}
           placeholder="Masukkan Kata Sandi Anda"
         />
@@ -366,6 +384,7 @@ function AuthPage({ mode, onNavigate, onAuthenticate }) {
               type="password"
               value={form.confirmPassword}
               onBlur={() => setTouched((current) => ({ ...current, confirmPassword: true }))}
+              maxLength={MAX_PASSWORD_LENGTH}
               onChange={(event) => updateField('confirmPassword', event.target.value)}
               placeholder="Konfirmasi Kata Sandi Anda"
             />
@@ -373,7 +392,7 @@ function AuthPage({ mode, onNavigate, onAuthenticate }) {
           </>
         )}
 
-        <button className={`primary-button ${!isFormValid ? 'is-disabled' : ''}`} type="submit">{isRegister ? 'Daftar' : 'Masuk'}</button>
+        <button className={`primary-button ${!isFormValid ? 'is-disabled' : ''}`} disabled={!isFormValid} type="submit">{isRegister ? 'Daftar' : 'Masuk'}</button>
         <FieldError message={serverError} />
 
         <p>
@@ -544,8 +563,15 @@ function CreateQuizModal({ onClose, onSubmit }) {
   const [submitted, setSubmitted] = useState(false);
   const [serverError, setServerError] = useState('');
   const hasCategory = Boolean(category || newCategory.trim());
-  const canSubmit = hasCategory;
-  const categoryError = submitted && !hasCategory ? 'Kategori kuis wajib dipilih atau ditambahkan.' : '';
+  const categoryTooLong = newCategory.trim().length > MAX_CATEGORY_LENGTH;
+  const canSubmit = hasCategory && !categoryTooLong;
+  const categoryError = submitted
+    ? !hasCategory
+      ? 'Kategori kuis wajib dipilih atau ditambahkan.'
+      : categoryTooLong
+        ? `Kategori maksimal ${MAX_CATEGORY_LENGTH} karakter.`
+        : ''
+    : '';
 
   const handleSubmit = async (event) => {
     event.preventDefault();
@@ -571,12 +597,12 @@ function CreateQuizModal({ onClose, onSubmit }) {
           <option>Sistem Operasi</option>
         </select>
         <div className="category-field">
-          <input className={categoryError ? 'input-error' : ''} value={newCategory} onChange={(event) => setNewCategory(event.target.value)} placeholder="Tambah Kategori" />
+          <input className={categoryError ? 'input-error' : ''} value={newCategory} maxLength={MAX_CATEGORY_LENGTH} onChange={(event) => setNewCategory(event.target.value)} placeholder="Tambah Kategori" />
           <button className="add-category-button" type="button" onClick={() => setCategory('')} aria-label="Tambah kategori"><FaPlus /></button>
         </div>
         <FieldError message={categoryError} />
         <FieldError message={serverError} />
-        <button className={!canSubmit ? 'is-disabled' : ''} type="submit">Lanjutkan membuat soal <FaArrowRight /></button>
+        <button className={!canSubmit ? 'is-disabled' : ''} disabled={!canSubmit} type="submit">Lanjutkan membuat soal <FaArrowRight /></button>
         <button className="modal-close" type="button" onClick={onClose}>Batalkan</button>
       </form>
     </div>
@@ -608,6 +634,14 @@ function AssignQuizModal({ quiz, onClose, onSubmit }) {
   const handleSubmit = async (event) => {
     event.preventDefault();
     const deadlineDate = new Date(deadline.year, deadline.month - 1, deadline.day, Number(deadline.hour.slice(0, 2)));
+    if (
+      deadlineDate.getFullYear() !== deadline.year
+      || deadlineDate.getMonth() !== deadline.month - 1
+      || deadlineDate.getDate() !== deadline.day
+    ) {
+      setError('Tanggal yang dipilih tidak valid.');
+      return;
+    }
     if (deadlineDate <= new Date()) {
       setError('Batas waktu harus lebih besar dari waktu sekarang.');
       return;
@@ -668,17 +702,32 @@ function EditorPage({ quiz, onNavigate, onSaveQuiz }) {
   const [submitted, setSubmitted] = useState(false);
   const [touched, setTouched] = useState({});
   const [saveError, setSaveError] = useState('');
+  const [imageError, setImageError] = useState('');
   const activeQuestion = questions[activeQuestionIndex] || questions[0];
 
-  const titleError = (submitted || touched.title) && !title.trim() ? 'Judul kuis wajib diisi.' : '';
+  const titleError = (submitted || touched.title)
+    ? !title.trim()
+      ? 'Judul kuis wajib diisi.'
+      : title.trim().length > MAX_TITLE_LENGTH
+        ? `Judul kuis maksimal ${MAX_TITLE_LENGTH} karakter.`
+        : ''
+    : '';
   const questionError = (submitted || touched[`question-${activeQuestionIndex}`]) && !activeQuestion.text.trim() ? 'Pertanyaan wajib diisi.' : '';
+  const timeLimitError = Number(activeQuestion.timeLimit) < 5 || Number(activeQuestion.timeLimit) > 300
+    ? 'Batas waktu harus 5 sampai 300 detik.'
+    : '';
   const answerErrors = activeQuestion.answers.map((answer, index) => (
     (submitted || touched[`answer-${activeQuestionIndex}-${index}`]) && !answer.trim()
       ? `Jawaban ${['A', 'B', 'C', 'D'][index]} wajib diisi.`
       : ''
   ));
-  const areQuestionsValid = questions.every((item) => item.text.trim() && item.answers.every((answer) => answer.trim()));
-  const canSave = title.trim() && areQuestionsValid;
+  const areQuestionsValid = questions.every((item) => (
+    item.text.trim()
+    && item.answers.every((answer) => answer.trim())
+    && Number(item.timeLimit) >= 5
+    && Number(item.timeLimit) <= 300
+  ));
+  const canSave = title.trim() && title.trim().length <= MAX_TITLE_LENGTH && areQuestionsValid && !imageError;
 
   const updateActiveQuestion = (changes) => {
     setQuestions((current) => current.map((item, index) => (
@@ -699,6 +748,17 @@ function EditorPage({ quiz, onNavigate, onSaveQuiz }) {
       return;
     }
 
+    if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
+      setImageError('Gambar harus JPG, PNG, WEBP, atau GIF.');
+      return;
+    }
+
+    if (file.size > MAX_IMAGE_SIZE) {
+      setImageError('Ukuran gambar maksimal 2 MB.');
+      return;
+    }
+
+    setImageError('');
     const reader = new FileReader();
     reader.onload = () => {
       updateActiveQuestion({ image: reader.result });
@@ -746,6 +806,7 @@ function EditorPage({ quiz, onNavigate, onSaveQuiz }) {
               className={titleError ? 'input-error' : ''}
               value={title}
               onBlur={() => setTouched((current) => ({ ...current, title: true }))}
+              maxLength={MAX_TITLE_LENGTH}
               onChange={(event) => setTitle(event.target.value)}
               placeholder="Masukan Judul disini"
             />
@@ -753,7 +814,7 @@ function EditorPage({ quiz, onNavigate, onSaveQuiz }) {
             <FieldError message={titleError} />
           </div>
           <button className="secondary-button" type="button" onClick={() => onNavigate('dashboard')}>Batal</button>
-          <button className={`save-button ${!canSave ? 'is-disabled' : ''}`} type="submit">Simpan</button>
+          <button className={`save-button ${!canSave ? 'is-disabled' : ''}`} disabled={!canSave} type="submit">Simpan</button>
           <FieldError message={saveError} />
         </header>
 
@@ -768,6 +829,7 @@ function EditorPage({ quiz, onNavigate, onSaveQuiz }) {
                   setActiveQuestionIndex(index);
                   setTouched({});
                   setSubmitted(false);
+                  setImageError('');
                 }}
               >
                 Soal {index + 1}
@@ -789,7 +851,7 @@ function EditorPage({ quiz, onNavigate, onSaveQuiz }) {
               {activeQuestion.image ? (
                 <>
                   <img src={activeQuestion.image} alt="Gambar soal" />
-                  <button className="remove-image-button" type="button" onClick={() => updateActiveQuestion({ image: '' })} aria-label="Hapus gambar"><FaTimes /></button>
+                  <button className="remove-image-button" type="button" onClick={() => { updateActiveQuestion({ image: '' }); setImageError(''); }} aria-label="Hapus gambar"><FaTimes /></button>
                 </>
               ) : (
                 <label className="image-button">
@@ -799,6 +861,7 @@ function EditorPage({ quiz, onNavigate, onSaveQuiz }) {
                 </label>
               )}
             </div>
+            <FieldError message={imageError} />
 
             <div className="answer-grid">
               {['A', 'B', 'C', 'D'].map((option, index) => (
@@ -828,6 +891,7 @@ function EditorPage({ quiz, onNavigate, onSaveQuiz }) {
                 <option value="20">20 detik</option>
                 <option value="30">30 detik</option>
               </select>
+              <FieldError message={timeLimitError} />
             </aside>
           )}
         </div>
@@ -864,7 +928,7 @@ function LiveWaitingPage({ pin, quiz, participants, onStart }) {
         {!participants.length && <p className="live-question-count">Belum ada peserta yang masuk.</p>}
       </div>
       <p className="live-question-count">{quiz.questions.length || 1} pertanyaan siap</p>
-      <button className={`live-start-button ${!participants.length ? 'is-disabled' : ''}`} type="button" onClick={onStart}>Mulai</button>
+      <button className={`live-start-button ${!participants.length ? 'is-disabled' : ''}`} disabled={!participants.length} type="button" onClick={onStart}>Mulai</button>
     </section>
   );
 }
@@ -999,7 +1063,8 @@ function ResultPage({ onNavigate, leaderboard }) {
 }
 
 export default function App() {
-  const [page, setPage] = useState('home');
+  const initialPage = window.history.state?.smartqPage || 'home';
+  const [page, setPageState] = useState(initialPage);
   const [quizzes, setQuizzes] = useState([]);
   const [activePanel, setActivePanel] = useState('beranda');
   const [activeQuizId, setActiveQuizId] = useState('');
@@ -1017,6 +1082,29 @@ export default function App() {
 
   const activeQuiz = quizzes.find((quiz) => quiz.id === activeQuizId) || quizzes[0];
   const assigningQuiz = quizzes.find((quiz) => quiz.id === assigningQuizId);
+
+  const navigateTo = (target, options = {}) => {
+    setPageState(target);
+    const nextState = { ...(window.history.state || {}), smartqPage: target };
+    if (options.replace) {
+      window.history.replaceState(nextState, '', window.location.href);
+      return;
+    }
+    window.history.pushState(nextState, '', window.location.href);
+  };
+
+  useEffect(() => {
+    if (!window.history.state?.smartqPage) {
+      window.history.replaceState({ ...(window.history.state || {}), smartqPage: page }, '', window.location.href);
+    }
+
+    const handlePopState = (event) => {
+      setPageState(event.state?.smartqPage || 'home');
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
 
   useEffect(() => {
     if (!currentUser) {
@@ -1052,7 +1140,7 @@ export default function App() {
         if (error.status === 401) {
           window.localStorage.removeItem('smartq-session');
           setCurrentUser(null);
-          setPage('login');
+          navigateTo('login', { replace: true });
         }
       }
     };
@@ -1091,7 +1179,7 @@ export default function App() {
     window.localStorage.removeItem('smartq-session');
     setCurrentUser(null);
     setActiveQuizId('');
-    setPage('home');
+    navigateTo('home');
   };
 
   const clearExpiredSession = () => {
@@ -1099,7 +1187,7 @@ export default function App() {
     setCurrentUser(null);
     setActiveQuizId('');
     setShowCreateModal(false);
-    setPage('login');
+    navigateTo('login', { replace: true });
   };
 
   const handleCreateQuiz = async ({ title, category }) => {
@@ -1117,7 +1205,7 @@ export default function App() {
       setQuizzes((current) => [quiz, ...current]);
       setActiveQuizId(quiz.id);
       setShowCreateModal(false);
-      setPage('editor');
+      navigateTo('editor');
       return { ok: true };
     } catch (error) {
       console.info('Kuis belum berhasil dibuat.', error);
@@ -1131,7 +1219,7 @@ export default function App() {
 
   const handleEditQuiz = (id) => {
     setActiveQuizId(id);
-    setPage('editor');
+    navigateTo('editor');
   };
 
   const handleStartLive = async (id) => {
@@ -1146,7 +1234,7 @@ export default function App() {
       setLivePin(openedQuiz.pin || '');
       const payload = await requestJson(`/api/quizzes/${id}/participants`);
       setLiveParticipants(payload.data || []);
-      setPage('live-creating');
+      navigateTo('live-creating');
     } catch (error) {
       console.info('Ruang live belum dapat dibuka.', error);
       setLiveParticipants([]);
@@ -1212,7 +1300,7 @@ export default function App() {
       setActiveQuizId(quiz.id);
       setParticipantPin(pin);
       setQuizRole('participant');
-      setPage('participant-name');
+      navigateTo('participant-name');
       return { ok: true };
     } catch (error) {
       return { ok: false, message: 'PIN kuis tidak ditemukan.' };
@@ -1233,7 +1321,7 @@ export default function App() {
       setQuizzes((current) => [quiz, ...current.filter((item) => item.id !== quiz.id)]);
       setParticipantName(name);
       setParticipantId(String(payload.data.participant.id));
-      setPage('participant-waiting');
+      navigateTo('participant-waiting');
       return { ok: true };
     } catch (error) {
       return { ok: false, message: 'Peserta belum bisa bergabung ke kuis.' };
@@ -1272,7 +1360,7 @@ export default function App() {
       const payload = await requestJson(`/api/quizzes/${activeQuizId}/start`, { method: 'PUT' });
       const startedQuiz = normalizeBackendQuiz(payload.data);
       setQuizzes((current) => current.map((quiz) => quiz.id === activeQuizId ? startedQuiz : quiz));
-      setPage('play');
+      navigateTo('play');
     } catch (error) {
       console.info('Kuis belum berhasil dimulai.', error);
     }
@@ -1286,7 +1374,7 @@ export default function App() {
         console.info('Status selesai belum dapat disimpan.', error);
       }
     }
-    setPage('result');
+    navigateTo('result');
   };
 
   const handleSubmitAnswer = async (questionId, selectedOption) => {
@@ -1337,13 +1425,13 @@ export default function App() {
     <>
       {page === 'home' && (
         <HomePage
-          onNavigate={(target) => setPage(target === 'login' && currentUser ? 'dashboard' : target)}
+          onNavigate={(target) => navigateTo(target === 'login' && currentUser ? 'dashboard' : target)}
           onJoin={handleJoinQuiz}
         />
       )}
       {page === 'participant-name' && <ParticipantNamePage pin={participantPin} onStart={handleStartQuiz} />}
-      {page === 'login' && <AuthPage mode="login" onNavigate={setPage} onAuthenticate={handleAuthenticate} />}
-      {page === 'register' && <AuthPage mode="register" onNavigate={setPage} onAuthenticate={handleAuthenticate} />}
+      {page === 'login' && <AuthPage mode="login" onNavigate={navigateTo} onAuthenticate={handleAuthenticate} />}
+      {page === 'register' && <AuthPage mode="register" onNavigate={navigateTo} onAuthenticate={handleAuthenticate} />}
       {page === 'dashboard' && (
         <DashboardPage
           quizzes={quizzes}
@@ -1358,20 +1446,20 @@ export default function App() {
           onLogout={handleLogout}
         />
       )}
-      {page === 'participant-waiting' && <ParticipantWaitingPage pin={participantPin} participantName={participantName} onReady={() => setPage('play')} />}
-      {page === 'live-creating' && <LiveCreatingPage onDone={() => setPage('live-waiting')} />}
+      {page === 'participant-waiting' && <ParticipantWaitingPage pin={participantPin} participantName={participantName} onReady={() => navigateTo('play', { replace: true })} />}
+      {page === 'live-creating' && <LiveCreatingPage onDone={() => navigateTo('live-waiting', { replace: true })} />}
       {page === 'live-waiting' && <LiveWaitingPage pin={livePin} quiz={activeQuiz} participants={liveParticipants} onStart={handleHostStart} />}
-      {page === 'editor' && activeQuiz && <EditorPage quiz={activeQuiz} onNavigate={setPage} onSaveQuiz={handleSaveQuiz} />}
+      {page === 'editor' && activeQuiz && <EditorPage quiz={activeQuiz} onNavigate={navigateTo} onSaveQuiz={handleSaveQuiz} />}
       {page === 'editor' && !activeQuiz && (
         <section className="page blue-page editor-loading-page">
           <div className="editor-loading-card">
             <p>Data kuis belum tersedia.</p>
-            <button type="button" onClick={() => setPage(currentUser ? 'dashboard' : 'login')}>Kembali</button>
+            <button type="button" onClick={() => navigateTo(currentUser ? 'dashboard' : 'login')}>Kembali</button>
           </div>
         </section>
       )}
       {page === 'play' && <PlayPage quiz={activeQuiz} onComplete={handleCompleteQuiz} participantName={participantName} onSubmitAnswer={handleSubmitAnswer} />}
-      {page === 'result' && <ResultPage onNavigate={setPage} leaderboard={leaderboard} />}
+      {page === 'result' && <ResultPage onNavigate={navigateTo} leaderboard={leaderboard} />}
       {showCreateModal && <CreateQuizModal onClose={() => setShowCreateModal(false)} onSubmit={handleCreateQuiz} />}
       {assigningQuiz && <AssignQuizModal quiz={assigningQuiz} onClose={() => setAssigningQuizId('')} onSubmit={handleCreateAssignment} />}
     </>

@@ -39,11 +39,13 @@ button {
 
 button:disabled {
   cursor: not-allowed;
-  opacity: .55;
+  filter: saturate(.55);
+  opacity: .5;
 }
 
 .is-disabled {
-  opacity: .55;
+  filter: saturate(.55);
+  opacity: .5;
 }
 
 .field-error {
@@ -195,6 +197,12 @@ button:disabled {
   font-size: 1.05rem;
 }
 
+.pin-card button:not(:disabled) {
+  background: #121212;
+  color: #fff;
+  box-shadow: 0 5px 12px rgba(0, 0, 0, .18);
+}
+
 .pin-card p {
   min-height: 16px;
   margin: 8px 0 0;
@@ -256,6 +264,12 @@ button:disabled {
   line-height: 1;
 }
 
+.participant-card button:not(:disabled) {
+  background: #151515;
+  color: #fff;
+  box-shadow: 0 8px 16px rgba(0, 0, 0, .16);
+}
+
 .participant-card .field-error {
   margin: 8px 0 -4px;
   text-align: center;
@@ -293,6 +307,12 @@ button:disabled {
   color: #e7e7e7;
   font-size: 1.15rem;
   font-weight: 900;
+}
+
+.primary-button:not(:disabled) {
+  background: #2c9fbe;
+  color: #fff;
+  box-shadow: 0 7px 14px rgba(7, 81, 144, .18);
 }
 
 .auth-card p {
@@ -790,6 +810,11 @@ button:disabled {
   font-size: 1.25rem;
 }
 
+.modal-card > button[type="submit"]:not(:disabled) {
+  background: #05a5d3;
+  box-shadow: 0 8px 16px rgba(0, 91, 128, .18);
+}
+
 .modal-card > button[type="submit"] svg {
   width: 42px;
   height: 42px;
@@ -941,6 +966,11 @@ button:disabled {
 .save-button {
   background: #168320;
   color: #fff;
+}
+
+.save-button:not(:disabled) {
+  background: #19a328;
+  box-shadow: 0 7px 14px rgba(22, 131, 32, .2);
 }
 
 .editor-body {
@@ -1270,6 +1300,12 @@ button:disabled {
   background: #0788ad;
   color: #e7e7e7;
   font-weight: 900;
+}
+
+.live-start-button:not(:disabled) {
+  background: #05a5d3;
+  color: #fff;
+  box-shadow: 0 8px 16px rgba(0, 91, 128, .2);
 }
 
 .live-wait-card {
