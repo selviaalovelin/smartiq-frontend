@@ -967,6 +967,60 @@ function LiveWaitingPage({ pin, quiz, participants, onStart }) {
   );
 }
 
+function HostMonitorPage({ quiz, participants, onFinish }) {
+  const totalQuestions = quiz?.questions.length || participants[0]?.total_questions || 0;
+  const completedCount = participants.filter((participant) => (
+    (participant.answered_count || 0) >= totalQuestions && totalQuestions > 0
+  )).length;
+
+  return (
+    <section className="page live-page host-monitor-page">
+      <div className="host-monitor-card">
+        <header className="host-monitor-header">
+          <div>
+            <span>Live kuis sedang berjalan</span>
+            <h1>{quiz?.title || 'Kuis'}</h1>
+            <p>{participants.length} peserta bergabung - {completedCount} selesai</p>
+          </div>
+          <button type="button" onClick={onFinish}>Selesai & lihat hasil</button>
+        </header>
+
+        <div className="monitor-table">
+          <div className="monitor-row head">
+            <strong>Peserta</strong>
+            <strong>Dikerjakan</strong>
+            <strong>Benar</strong>
+            <strong>Salah</strong>
+            <strong>Progres</strong>
+          </div>
+          {participants.map((participant) => {
+            const answered = participant.answered_count || 0;
+            const correct = participant.correct_count ?? participant.score ?? 0;
+            const wrong = participant.wrong_count ?? Math.max(0, answered - correct);
+            const percent = participant.progress_percent ?? (totalQuestions ? Math.round((answered / totalQuestions) * 100) : 0);
+
+            return (
+              <div className="monitor-row" key={participant.id}>
+                <strong>{participant.name}</strong>
+                <span>{answered}/{totalQuestions || '-'}</span>
+                <span className="correct-count">{correct}</span>
+                <span className="wrong-count">{wrong}</span>
+                <div className="progress-cell">
+                  <div className="progress-track"><span style={{ width: `${Math.min(100, percent)}%` }} /></div>
+                  <small>{percent}%</small>
+                </div>
+              </div>
+            );
+          })}
+          {!participants.length && (
+            <p className="monitor-empty">Belum ada peserta yang mengerjakan.</p>
+          )}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function PlayPage({ quiz, onComplete, participantName, onSubmitAnswer }) {
   const fallback = starterQuizzes[0].questions[0];
   const quizQuestions = quiz?.questions.length ? quiz.questions : [fallback];
@@ -1266,8 +1320,7 @@ export default function App() {
       const openedQuiz = normalizeBackendQuiz(opened.data);
       setQuizzes((current) => current.map((item) => item.id === id ? openedQuiz : item));
       setLivePin(openedQuiz.pin || '');
-      const payload = await requestJson(`/api/quizzes/${id}/participants`);
-      setLiveParticipants(payload.data || []);
+      setLiveParticipants([]);
       navigateTo('live-creating');
     } catch (error) {
       console.info('Ruang live belum dapat dibuka.', error);
@@ -1394,7 +1447,7 @@ export default function App() {
       const payload = await requestJson(`/api/quizzes/${activeQuizId}/start`, { method: 'PUT' });
       const startedQuiz = normalizeBackendQuiz(payload.data);
       setQuizzes((current) => current.map((quiz) => quiz.id === activeQuizId ? startedQuiz : quiz));
-      navigateTo('play');
+      navigateTo('host-monitor');
     } catch (error) {
       console.info('Kuis belum berhasil dimulai.', error);
     }
@@ -1427,7 +1480,7 @@ export default function App() {
   };
 
   useEffect(() => {
-    if (page !== 'live-waiting' || !isBackendId(activeQuizId)) {
+    if (!['live-waiting', 'host-monitor'].includes(page) || !isBackendId(activeQuizId)) {
       return undefined;
     }
 
@@ -1483,6 +1536,7 @@ export default function App() {
       {page === 'participant-waiting' && <ParticipantWaitingPage pin={participantPin} participantName={participantName} onReady={() => navigateTo('play', { replace: true })} />}
       {page === 'live-creating' && <LiveCreatingPage onDone={() => navigateTo('live-waiting', { replace: true })} />}
       {page === 'live-waiting' && <LiveWaitingPage pin={livePin} quiz={activeQuiz} participants={liveParticipants} onStart={handleHostStart} />}
+      {page === 'host-monitor' && <HostMonitorPage quiz={activeQuiz} participants={liveParticipants} onFinish={handleCompleteQuiz} />}
       {page === 'editor' && activeQuiz && <EditorPage quiz={activeQuiz} onNavigate={navigateTo} onSaveQuiz={handleSaveQuiz} />}
       {page === 'editor' && !activeQuiz && (
         <section className="page blue-page editor-loading-page">
