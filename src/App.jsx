@@ -144,6 +144,22 @@ const hourOptions = Array.from({ length: 24 }, (_, index) => `${String(index).pa
 
 const formatDate = ({ day, month, year }) => `${day} ${monthNames[month - 1]} ${year}`;
 const slugifyTitle = (title) => title.replace(/\s+/g, '').replace(/[^\w]/g, '') || 'soalQuiz';
+const formatCreatedDate = (value) => {
+  if (!value) {
+    return '-';
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.valueOf())) {
+    return '-';
+  }
+
+  return date.toLocaleDateString('id-ID', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  });
+};
 
 function FieldError({ message }) {
   return message ? <p className="field-error">{message}</p> : null;
@@ -415,7 +431,11 @@ function DashboardPage({ quizzes, assignments, activePanel, setActivePanel, onCr
   const today = new Date().toDateString();
   const createdToday = quizzes.filter((quiz) => quiz.createdAt && new Date(quiz.createdAt).toDateString() === today).length;
   const finishedReports = assignments.length;
-  const filteredQuizzes = quizzes.filter((quiz) => quiz.title.toLowerCase().includes(keyword.toLowerCase()));
+  const filteredQuizzes = quizzes.filter((quiz) => (
+    `${quiz.title} ${quiz.category} ${formatCreatedDate(quiz.createdAt)}`
+      .toLowerCase()
+      .includes(keyword.toLowerCase())
+  ));
 
   const groupedReports = useMemo(() => {
     return quizzes.reduce((result, quiz) => {
@@ -487,7 +507,14 @@ function DashboardPage({ quizzes, assignments, activePanel, setActivePanel, onCr
               </div>
               <article className="activity-card">
                 <h2>Aktivitas Terbaru</h2>
-                <p>Buat soal: {quizzes[0]?.title || 'Belum ada kuis'}</p>
+                {quizzes[0] ? (
+                  <p>
+                    Buat soal: {quizzes[0].title}
+                    <span>{quizzes[0].category} - {formatCreatedDate(quizzes[0].createdAt)}</span>
+                  </p>
+                ) : (
+                  <p>Belum ada kuis</p>
+                )}
               </article>
             </>
           )}
@@ -496,10 +523,17 @@ function DashboardPage({ quizzes, assignments, activePanel, setActivePanel, onCr
             <>
               <input className="search-input" value={keyword} onChange={(event) => setKeyword(event.target.value)} placeholder="Cari" />
               <div className="quiz-table">
-                <div className="quiz-row head"><strong>Judul</strong><strong>Aksi</strong></div>
+                <div className="quiz-row head">
+                  <strong aria-label="Nama kuis"></strong>
+                  <strong>Kategori</strong>
+                  <strong>Tanggal dibuat</strong>
+                  <strong>Aksi</strong>
+                </div>
                 {filteredQuizzes.map((quiz) => (
                   <div className="quiz-row" key={quiz.id}>
                     <span>{quiz.title}</span>
+                    <span>{quiz.category || '-'}</span>
+                    <span>{formatCreatedDate(quiz.createdAt)}</span>
                     <div className="quiz-actions-menu">
                       <button className="dots-button" type="button" onClick={() => setOpenMenuId((current) => (current === quiz.id ? '' : quiz.id))}><BsThreeDotsVertical /></button>
                       {openMenuId === quiz.id && (
