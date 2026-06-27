@@ -82,7 +82,7 @@ const normalizeBackendAssignment = (assignment) => {
     endTime: Number.isNaN(deadline.valueOf()) ? '' : deadline.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
     host: assignment.host || 'Pengajar',
     pin: quiz.pin || '-',
-    url: `${window.location.origin}?pin=${quiz.pin || ''}`,
+    url: `${window.location.origin}?pin=${quiz.pin || ''}&assignment=${assignment.id}`,
   };
 };
 
@@ -459,6 +459,12 @@ function AuthPage({ mode, onNavigate, onAuthenticate }) {
         <button className={`primary-button ${!isFormValid ? 'is-disabled' : ''}`} disabled={!isFormValid} type="submit">{isRegister ? 'Daftar' : 'Masuk'}</button>
         <FieldError message={serverError} />
 
+        {!isRegister && (
+          <button className="forgot-button" type="button" onClick={() => onNavigate('forgot-password')}>
+            Lupa kata sandi?
+          </button>
+        )}
+
         <p>
           {isRegister ? 'Sudah punya akun?' : 'Belum memiliki akun?'}
           <button className="inline-button" type="button" onClick={() => onNavigate(isRegister ? 'login' : 'register')}>
@@ -470,7 +476,155 @@ function AuthPage({ mode, onNavigate, onAuthenticate }) {
   );
 }
 
-function DashboardPage({ quizzes, assignments, activePanel, setActivePanel, onCreate, onEdit, onStartLive, onAssign, onDelete, onLogout, onViewAssignmentResult }) {
+function ForgotPasswordPage({ onNavigate }) {
+  const [email, setEmail] = useState('');
+  const [submitted, setSubmitted] = useState(false);
+  const [message, setMessage] = useState('');
+  const emailError = submitted
+    ? !email.trim()
+      ? 'Email wajib diisi.'
+      : !isEmailValid(email)
+        ? 'Format email belum benar.'
+        : ''
+    : '';
+
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    setSubmitted(true);
+    setMessage('');
+    if (emailError || !email.trim() || !isEmailValid(email)) {
+      return;
+    }
+
+    try {
+      const payload = await requestJson('/api/auth/forgot-password', {
+        method: 'POST',
+        body: JSON.stringify({ email: email.trim() }),
+      });
+      setMessage(payload.message || 'Link reset kata sandi sudah dikirim jika email terdaftar.');
+    } catch {
+      setMessage('Permintaan reset belum berhasil. Coba lagi sebentar.');
+    }
+  };
+
+  return (
+    <section className="page blue-page auth-page">
+      <form className="auth-card" onSubmit={handleSubmit} noValidate>
+        <h2>Lupa Kata Sandi</h2>
+        <p className="auth-helper">Masukkan email akun pengajar, nanti sistem mengirim link reset kata sandi.</p>
+        <label>Email:</label>
+        <input
+          className={emailError ? 'input-error' : ''}
+          type="email"
+          value={email}
+          maxLength={MAX_EMAIL_LENGTH}
+          onChange={(event) => setEmail(event.target.value)}
+          placeholder="Masukkan Email Anda"
+        />
+        <FieldError message={emailError} />
+        <button className="primary-button" type="submit">Kirim Link Reset</button>
+        {message && <p className="auth-success">{message}</p>}
+        <button className="forgot-button" type="button" onClick={() => onNavigate('login')}>Kembali ke login</button>
+      </form>
+    </section>
+  );
+}
+
+function ResetPasswordPage({ email, token, onNavigate }) {
+  const [form, setForm] = useState({ password: '', confirmPassword: '' });
+  const [submitted, setSubmitted] = useState(false);
+  const [message, setMessage] = useState('');
+  const [visiblePassword, setVisiblePassword] = useState({ password: false, confirmPassword: false });
+
+  const errors = {
+    password: !form.password
+      ? 'Kata sandi wajib diisi.'
+      : form.password.length < 8
+        ? 'Kata sandi minimal 8 karakter.'
+        : form.password.length > MAX_PASSWORD_LENGTH
+          ? `Kata sandi maksimal ${MAX_PASSWORD_LENGTH} karakter.`
+          : '',
+    confirmPassword: !form.confirmPassword
+      ? 'Konfirmasi kata sandi wajib diisi.'
+      : form.confirmPassword !== form.password
+        ? 'Konfirmasi kata sandi harus sama.'
+        : '',
+  };
+  const showError = (field) => submitted ? errors[field] : '';
+  const isFormValid = !errors.password && !errors.confirmPassword && email && token;
+
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    setSubmitted(true);
+    setMessage('');
+    if (!isFormValid) {
+      return;
+    }
+
+    try {
+      const payload = await requestJson('/api/auth/reset-password', {
+        method: 'POST',
+        body: JSON.stringify({
+          email,
+          token,
+          password: form.password,
+          password_confirmation: form.confirmPassword,
+        }),
+      });
+      setMessage(payload.message || 'Kata sandi berhasil diganti.');
+      window.history.replaceState({ smartqPage: 'login' }, '', window.location.pathname);
+    } catch (error) {
+      setMessage(error.message || 'Link reset tidak valid atau sudah kedaluwarsa.');
+    }
+  };
+
+  return (
+    <section className="page blue-page auth-page">
+      <form className="auth-card" onSubmit={handleSubmit} noValidate>
+        <h2>Reset Kata Sandi</h2>
+        <p className="auth-helper">{email ? `Akun: ${email}` : 'Link reset tidak lengkap.'}</p>
+
+        <label>Kata Sandi Baru:</label>
+        <div className="password-field">
+          <input
+            className={showError('password') ? 'input-error' : ''}
+            type={visiblePassword.password ? 'text' : 'password'}
+            value={form.password}
+            maxLength={MAX_PASSWORD_LENGTH}
+            onChange={(event) => setForm((current) => ({ ...current, password: event.target.value }))}
+            placeholder="Masukkan Kata Sandi Baru"
+          />
+          <button type="button" onClick={() => setVisiblePassword((current) => ({ ...current, password: !current.password }))}>
+            {visiblePassword.password ? <FaEyeSlash /> : <FaEye />}
+          </button>
+        </div>
+        <FieldError message={showError('password')} />
+
+        <label>Konfirmasi Kata Sandi:</label>
+        <div className="password-field">
+          <input
+            className={showError('confirmPassword') ? 'input-error' : ''}
+            type={visiblePassword.confirmPassword ? 'text' : 'password'}
+            value={form.confirmPassword}
+            maxLength={MAX_PASSWORD_LENGTH}
+            onChange={(event) => setForm((current) => ({ ...current, confirmPassword: event.target.value }))}
+            placeholder="Konfirmasi Kata Sandi Baru"
+          />
+          <button type="button" onClick={() => setVisiblePassword((current) => ({ ...current, confirmPassword: !current.confirmPassword }))}>
+            {visiblePassword.confirmPassword ? <FaEyeSlash /> : <FaEye />}
+          </button>
+        </div>
+        <FieldError message={showError('confirmPassword')} />
+
+        <button className={`primary-button ${!isFormValid ? 'is-disabled' : ''}`} disabled={!isFormValid} type="submit">Simpan Kata Sandi</button>
+        {message && <p className={message.includes('berhasil') ? 'auth-success' : 'field-error'}>{message}</p>}
+        <button className="forgot-button" type="button" onClick={() => onNavigate('login')}>Kembali ke login</button>
+      </form>
+    </section>
+  );
+}
+
+function DashboardPage({ quizzes, assignments, activePanel, setActivePanel, onCreate, onEdit, onStartLive, onAssign, onDelete, onLogout, onViewAssignmentResult, onViewLiveResult }) {
   const [keyword, setKeyword] = useState('');
   const [openMenuId, setOpenMenuId] = useState('');
   const [copiedValue, setCopiedValue] = useState('');
@@ -605,14 +759,31 @@ function DashboardPage({ quizzes, assignments, activePanel, setActivePanel, onCr
                 <div className="report-column" key={quiz.id}>
                   <article className="report-card">
                     <h3>{quiz.category || quiz.title}</h3>
+                    <span className="report-quiz-name">{quiz.title}</span>
                     <strong>{quiz.questions.length ? `${quiz.questions.length} Soal Tersedia` : 'Belum Tersedia Soal'}</strong>
                     <button type="button" onClick={() => setActivePanel('pustaka')}>Lihat Selengkapnya</button>
                   </article>
 
+                  {quiz.status === 'finished' && (
+                    <article className="assignment-report-card">
+                      <div>
+                        <span className="report-type-badge live">Hasil live kuis</span>
+                        <strong>{quiz.title}</strong>
+                      </div>
+                      <dl>
+                        <div><dt>Tanggal dibuat:</dt><dd>{formatCreatedDate(quiz.createdAt)}</dd></div>
+                        <div><dt>Pin game:</dt><dd>{quiz.pin || '-'}</dd></div>
+                      </dl>
+                      <button className="assignment-result-button" type="button" onClick={() => onViewLiveResult(quiz)}>
+                        Lihat hasil live
+                      </button>
+                    </article>
+                  )}
+
                   {reports.map((assignment) => (
                     <article className="assignment-report-card" key={assignment.id}>
                       <div>
-                        <span>Laporan</span>
+                        <span className="report-type-badge assigned">Tugas kuis</span>
                         <strong>{assignment.title}</strong>
                       </div>
                       <dl>
@@ -780,7 +951,7 @@ function AssignQuizModal({ quiz, onClose, onSubmit }) {
   );
 }
 
-function EditorPage({ quiz, onNavigate, onSaveQuiz }) {
+function EditorPage({ quiz, onCancel, onSaveQuiz }) {
   const [title, setTitle] = useState(quiz.title);
   const [questions, setQuestions] = useState(() => (
     quiz.questions.length ? quiz.questions.map((question) => ({ timeLimit: 10, ...question })) : [createEmptyQuestion()]
@@ -878,7 +1049,7 @@ function EditorPage({ quiz, onNavigate, onSaveQuiz }) {
       })),
     });
     if (saved) {
-      onNavigate('dashboard');
+      onCancel(quiz.id);
     } else {
       setSaveError('Kuis belum berhasil disimpan. Periksa koneksi backend.');
     }
@@ -901,7 +1072,7 @@ function EditorPage({ quiz, onNavigate, onSaveQuiz }) {
             <button className="editor-gear" type="button" onClick={() => setShowProperties(true)} aria-label="Properti soal"><FaCog /></button>
             <FieldError message={titleError} />
           </div>
-          <button className="secondary-button" type="button" onClick={() => onNavigate('dashboard')}>Batal</button>
+          <button className="secondary-button" type="button" onClick={() => onCancel(quiz.id)}>Batal</button>
           <button className={`save-button ${!canSave ? 'is-disabled' : ''}`} disabled={!canSave} type="submit">Simpan</button>
           <FieldError message={saveError} />
         </header>
@@ -1077,6 +1248,7 @@ function HostMonitorPage({ quiz, participants, onFinish }) {
 
 function AssignmentResultPage({ assignment, participants, loading, onBack }) {
   const totalQuestions = assignment?.totalQuestions || participants[0]?.total_questions || 0;
+  const isLiveReport = assignment?.type === 'live';
 
   return (
     <section className="page dashboard-page assignment-result-page">
@@ -1089,9 +1261,9 @@ function AssignmentResultPage({ assignment, participants, loading, onBack }) {
         <section className="assignment-result-card">
           <div className="assignment-result-head">
             <div>
-              <span>Hasil tugas kuis</span>
+              <span>{isLiveReport ? 'Hasil live kuis' : 'Hasil tugas kuis'}</span>
               <h1>{assignment?.title || 'Kuis'}</h1>
-              <p>PIN {assignment?.pin || '-'} - batas {assignment?.endDate || '-'}</p>
+              <p>{isLiveReport ? `PIN ${assignment?.pin || '-'}` : `PIN ${assignment?.pin || '-'} - batas ${assignment?.endDate || '-'}`}</p>
             </div>
             <strong>{participants.length} peserta</strong>
           </div>
@@ -1263,7 +1435,12 @@ function ResultPage({ onNavigate, leaderboard }) {
 }
 
 export default function App() {
-  const initialPage = window.history.state?.smartqPage || 'home';
+  const resetParams = new URLSearchParams(window.location.search);
+  const resetToken = resetParams.get('reset_token') || '';
+  const resetEmail = resetParams.get('email') || '';
+  const urlPin = resetParams.get('pin') || '';
+  const urlAssignmentId = resetParams.get('assignment') || '';
+  const initialPage = resetToken ? 'reset-password' : window.history.state?.smartqPage || 'home';
   const [page, setPageState] = useState(initialPage);
   const [quizzes, setQuizzes] = useState([]);
   const [activePanel, setActivePanel] = useState('beranda');
@@ -1277,6 +1454,7 @@ export default function App() {
   const [participantPin, setParticipantPin] = useState('');
   const [participantName, setParticipantName] = useState('');
   const [participantId, setParticipantId] = useState('');
+  const [participantAssignmentId, setParticipantAssignmentId] = useState('');
   const [livePin, setLivePin] = useState('');
   const [liveParticipants, setLiveParticipants] = useState([]);
   const [leaderboard, setLeaderboard] = useState([]);
@@ -1458,29 +1636,29 @@ export default function App() {
 
   const handleCreateQuiz = async ({ title, category }) => {
     const quizTitle = title || `Soal Quiz ${quizzes.length + 1}`;
-    try {
-      const payload = await requestJson('/api/quizzes', {
-        method: 'POST',
-        body: JSON.stringify({
-          title: quizTitle,
-          category,
-        }),
-      });
+    const draftQuiz = {
+      id: `draft-${Date.now()}`,
+      title: quizTitle,
+      category,
+      pin: '',
+      status: 'draft',
+      createdAt: '',
+      questions: [],
+    };
 
-      const quiz = normalizeBackendQuiz(payload.data);
-      setQuizzes((current) => [quiz, ...current]);
-      setActiveQuizId(quiz.id);
-      setShowCreateModal(false);
-      navigateTo('editor');
-      return { ok: true };
-    } catch (error) {
-      console.info('Kuis belum berhasil dibuat.', error);
-      if (error.status === 401) {
-        clearExpiredSession();
-        return { ok: false, message: 'Sesi sudah berakhir. Silakan masuk kembali.' };
-      }
-      return { ok: false, message: error.message || 'Kuis belum berhasil dibuat.' };
+    setQuizzes((current) => [draftQuiz, ...current]);
+    setActiveQuizId(draftQuiz.id);
+    setShowCreateModal(false);
+    navigateTo('editor');
+    return { ok: true };
+  };
+
+  const handleCancelEditor = (quizId) => {
+    if (!isBackendId(quizId)) {
+      setQuizzes((current) => current.filter((quiz) => quiz.id !== quizId));
+      setActiveQuizId((current) => (current === quizId ? '' : current));
     }
+    navigateTo('dashboard');
   };
 
   const handleEditQuiz = (id) => {
@@ -1492,6 +1670,7 @@ export default function App() {
     setActiveQuizId(id);
     setParticipantId('');
     setParticipantName('');
+    setParticipantAssignmentId('');
     setQuizRole('host');
     try {
       const opened = await requestJson(`/api/quizzes/${id}/open`, { method: 'PUT' });
@@ -1511,16 +1690,41 @@ export default function App() {
   };
 
   const handleViewAssignmentResult = async (assignment) => {
-    setSelectedAssignment(assignment);
+    setSelectedAssignment({ ...assignment, type: 'assigned' });
     setAssignmentResults([]);
     setAssignmentResultsLoading(true);
     navigateTo('assignment-result');
 
     try {
-      const payload = await requestJson(`/api/quizzes/${assignment.quizId}/participants`);
+      const payload = await requestJson(`/api/assignments/${assignment.id}/participants`);
       setAssignmentResults(payload.data || []);
     } catch (error) {
       console.info('Hasil tugas belum dapat dimuat.', error);
+      setAssignmentResults([]);
+    } finally {
+      setAssignmentResultsLoading(false);
+    }
+  };
+
+  const handleViewLiveResult = async (quiz) => {
+    setSelectedAssignment({
+      id: `live-${quiz.id}`,
+      quizId: quiz.id,
+      type: 'live',
+      title: quiz.title,
+      totalQuestions: quiz.questions.length,
+      pin: quiz.pin || '-',
+      endDate: formatCreatedDate(quiz.createdAt),
+    });
+    setAssignmentResults([]);
+    setAssignmentResultsLoading(true);
+    navigateTo('assignment-result');
+
+    try {
+      const payload = await requestJson(`/api/quizzes/${quiz.id}/participants`);
+      setAssignmentResults(payload.data || []);
+    } catch (error) {
+      console.info('Hasil live belum dapat dimuat.', error);
       setAssignmentResults([]);
     } finally {
       setAssignmentResultsLoading(false);
@@ -1581,6 +1785,7 @@ export default function App() {
       setQuizzes((current) => [quiz, ...current.filter((item) => item.id !== quiz.id)]);
       setActiveQuizId(quiz.id);
       setParticipantPin(pin);
+      setParticipantAssignmentId('');
       setQuizRole('participant');
       navigateTo('participant-name');
       return { ok: true };
@@ -1597,18 +1802,45 @@ export default function App() {
     try {
       const payload = await requestJson(`/api/quizzes/${activeQuizId}/participants`, {
         method: 'POST',
-        body: JSON.stringify({ name }),
+        body: JSON.stringify({ name, assignment_id: participantAssignmentId || null }),
       });
       const quiz = normalizeBackendQuiz(payload.data.quiz);
       setQuizzes((current) => [quiz, ...current.filter((item) => item.id !== quiz.id)]);
       setParticipantName(name);
       setParticipantId(String(payload.data.participant.id));
-      navigateTo('participant-waiting');
+      navigateTo(participantAssignmentId ? 'play' : 'participant-waiting');
       return { ok: true };
     } catch (error) {
       return { ok: false, message: 'Peserta belum bisa bergabung ke kuis.' };
     }
   };
+
+  useEffect(() => {
+    if (!urlPin || resetToken) {
+      return;
+    }
+
+    let isMounted = true;
+    const assignmentQuery = urlAssignmentId ? `?assignment_id=${encodeURIComponent(urlAssignmentId)}` : '';
+    requestJson(`/api/quizzes/pin/${urlPin}${assignmentQuery}`)
+      .then((payload) => {
+        if (!isMounted) {
+          return;
+        }
+        const quiz = normalizeBackendQuiz(payload.data);
+        setQuizzes((current) => [quiz, ...current.filter((item) => item.id !== quiz.id)]);
+        setActiveQuizId(quiz.id);
+        setParticipantPin(urlPin);
+        setParticipantAssignmentId(urlAssignmentId);
+        setQuizRole('participant');
+        navigateTo('participant-name', { replace: true });
+      })
+      .catch((error) => console.info('PIN dari link belum dapat dibuka.', error));
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const handleSaveQuiz = async (quizId, payload) => {
     const currentQuiz = quizzes.find((quiz) => quiz.id === quizId);
@@ -1631,7 +1863,24 @@ export default function App() {
         return false;
       }
     }
-    return false;
+
+    try {
+      const response = await requestJson('/api/quizzes', {
+        method: 'POST',
+        body: JSON.stringify({
+          title: payload.title || currentQuiz?.title || 'Soal Quiz',
+          category: currentQuiz?.category || 'Layanan Web',
+          questions: payload.questions,
+        }),
+      });
+      const savedQuiz = normalizeBackendQuiz(response.data);
+      setQuizzes((current) => [savedQuiz, ...current.filter((quiz) => quiz.id !== quizId)]);
+      setActiveQuizId(savedQuiz.id);
+      return true;
+    } catch (error) {
+      console.info('Kuis baru belum berhasil disimpan.', error);
+      return false;
+    }
   };
 
   const handleHostStart = async () => {
@@ -1716,6 +1965,8 @@ export default function App() {
       {page === 'participant-name' && <ParticipantNamePage pin={participantPin} onStart={handleStartQuiz} />}
       {page === 'login' && <AuthPage mode="login" onNavigate={navigateTo} onAuthenticate={handleAuthenticate} />}
       {page === 'register' && <AuthPage mode="register" onNavigate={navigateTo} onAuthenticate={handleAuthenticate} />}
+      {page === 'forgot-password' && <ForgotPasswordPage onNavigate={navigateTo} />}
+      {page === 'reset-password' && <ResetPasswordPage email={resetEmail} token={resetToken} onNavigate={navigateTo} />}
       {page === 'dashboard' && (
         <DashboardPage
           quizzes={quizzes}
@@ -1729,6 +1980,7 @@ export default function App() {
           onDelete={handleDeleteQuiz}
           onLogout={handleLogout}
           onViewAssignmentResult={handleViewAssignmentResult}
+          onViewLiveResult={handleViewLiveResult}
         />
       )}
       {page === 'assignment-result' && (
@@ -1746,7 +1998,7 @@ export default function App() {
       {page === 'live-creating' && <LiveCreatingPage onDone={() => navigateTo('live-waiting', { replace: true })} />}
       {page === 'live-waiting' && <LiveWaitingPage pin={livePin} quiz={activeQuiz} participants={liveParticipants} onStart={handleHostStart} />}
       {page === 'host-monitor' && <HostMonitorPage quiz={activeQuiz} participants={liveParticipants} onFinish={handleCompleteQuiz} />}
-      {page === 'editor' && activeQuiz && <EditorPage quiz={activeQuiz} onNavigate={navigateTo} onSaveQuiz={handleSaveQuiz} />}
+      {page === 'editor' && activeQuiz && <EditorPage quiz={activeQuiz} onCancel={handleCancelEditor} onSaveQuiz={handleSaveQuiz} />}
       {page === 'editor' && !activeQuiz && (
         <section className="page blue-page editor-loading-page">
           <div className="editor-loading-card">

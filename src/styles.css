@@ -350,6 +350,25 @@ button:disabled {
   text-align: center;
 }
 
+.auth-card h2 {
+  margin: 0 0 8px;
+  text-align: center;
+}
+
+.auth-helper {
+  margin: 0 0 14px !important;
+  color: #064d78;
+  font-weight: 800;
+  line-height: 1.45;
+}
+
+.auth-success {
+  margin: 10px 0 0 !important;
+  color: #087a33;
+  font-weight: 900;
+  line-height: 1.4;
+}
+
 .auth-card .field-error {
   margin: 5px 0 8px;
   text-align: right;
@@ -360,6 +379,15 @@ button:disabled {
   background: transparent;
   color: #07609a;
   font-weight: 800;
+}
+
+.forgot-button {
+  display: block;
+  margin: 10px auto 0;
+  border: 0;
+  background: transparent;
+  color: #07609a;
+  font-weight: 900;
 }
 
 .dashboard-page {
@@ -642,6 +670,14 @@ button:disabled {
   padding: 18px;
 }
 
+.report-quiz-name {
+  display: block;
+  margin: -4px 0 12px;
+  color: var(--blue);
+  font-size: .9rem;
+  font-weight: 900;
+}
+
 .report-card button {
   border: 0;
   background: transparent;
@@ -670,6 +706,24 @@ button:disabled {
   display: block;
   margin-top: 10px;
   font-size: 1.1rem;
+}
+
+.report-type-badge {
+  display: inline-flex;
+  width: fit-content;
+  padding: 5px 10px;
+  border-radius: 999px;
+  color: #fff;
+  font-size: .78rem;
+  font-weight: 900;
+}
+
+.report-type-badge.live {
+  background: #0f5f9f;
+}
+
+.report-type-badge.assigned {
+  background: #078b76;
 }
 
 .assignment-report-card dl {
