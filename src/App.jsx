@@ -480,6 +480,8 @@ function ForgotPasswordPage({ onNavigate }) {
   const [email, setEmail] = useState('');
   const [submitted, setSubmitted] = useState(false);
   const [message, setMessage] = useState('');
+  const [isSuccess, setIsSuccess] = useState(false);
+  const isEmailReady = email.trim() && isEmailValid(email);
   const emailError = submitted
     ? !email.trim()
       ? 'Email wajib diisi.'
@@ -492,7 +494,8 @@ function ForgotPasswordPage({ onNavigate }) {
     event.preventDefault();
     setSubmitted(true);
     setMessage('');
-    if (emailError || !email.trim() || !isEmailValid(email)) {
+    setIsSuccess(false);
+    if (!isEmailReady) {
       return;
     }
 
@@ -502,8 +505,10 @@ function ForgotPasswordPage({ onNavigate }) {
         body: JSON.stringify({ email: email.trim() }),
       });
       setMessage(payload.message || 'Link reset kata sandi sudah dikirim jika email terdaftar.');
-    } catch {
+      setIsSuccess(true);
+    } catch (error) {
       setMessage('Permintaan reset belum berhasil. Coba lagi sebentar.');
+      setIsSuccess(false);
     }
   };
 
@@ -511,7 +516,6 @@ function ForgotPasswordPage({ onNavigate }) {
     <section className="page blue-page auth-page">
       <form className="auth-card" onSubmit={handleSubmit} noValidate>
         <h2>Lupa Kata Sandi</h2>
-        <p className="auth-helper">Masukkan email akun pengajar, nanti sistem mengirim link reset kata sandi.</p>
         <label>Email:</label>
         <input
           className={emailError ? 'input-error' : ''}
@@ -522,8 +526,8 @@ function ForgotPasswordPage({ onNavigate }) {
           placeholder="Masukkan Email Anda"
         />
         <FieldError message={emailError} />
-        <button className="primary-button" type="submit">Kirim Link Reset</button>
-        {message && <p className="auth-success">{message}</p>}
+        <button className={`primary-button ${!isEmailReady ? 'is-disabled' : ''}`} disabled={!isEmailReady} type="submit">Kirim Link Reset</button>
+        {message && <p className={isSuccess ? 'auth-success' : 'field-error'}>{message}</p>}
         <button className="forgot-button" type="button" onClick={() => onNavigate('login')}>Kembali ke login</button>
       </form>
     </section>
@@ -624,7 +628,7 @@ function ResetPasswordPage({ email, token, onNavigate }) {
   );
 }
 
-function DashboardPage({ quizzes, assignments, activePanel, setActivePanel, onCreate, onEdit, onStartLive, onAssign, onDelete, onLogout, onViewAssignmentResult, onViewLiveResult }) {
+function DashboardPage({ quizzes, assignments, activePanel, setActivePanel, onCreate, onEdit, onStartLive, onAssign, onDelete, onLogout, onViewAssignmentResult, onViewLiveResult, onDeleteReport }) {
   const [keyword, setKeyword] = useState('');
   const [openMenuId, setOpenMenuId] = useState('');
   const [copiedValue, setCopiedValue] = useState('');
@@ -777,6 +781,9 @@ function DashboardPage({ quizzes, assignments, activePanel, setActivePanel, onCr
                       <button className="assignment-result-button" type="button" onClick={() => onViewLiveResult(quiz)}>
                         Lihat hasil live
                       </button>
+                      <button className="report-delete-button" type="button" onClick={() => onDeleteReport({ type: 'live', quizId: quiz.id, title: quiz.title })}>
+                        Hapus laporan
+                      </button>
                     </article>
                   )}
 
@@ -795,6 +802,9 @@ function DashboardPage({ quizzes, assignments, activePanel, setActivePanel, onCr
                       </dl>
                       <button className="assignment-result-button" type="button" onClick={() => onViewAssignmentResult(assignment)}>
                         Lihat hasil
+                      </button>
+                      <button className="report-delete-button" type="button" onClick={() => onDeleteReport({ type: 'assigned', assignmentId: assignment.id, quizId: assignment.quizId, title: assignment.title })}>
+                        Hapus laporan
                       </button>
                     </article>
                   ))}
@@ -1305,7 +1315,7 @@ function AssignmentResultPage({ assignment, participants, loading, onBack }) {
   );
 }
 
-function PlayPage({ quiz, onComplete, participantName, onSubmitAnswer }) {
+function PlayPage({ quiz, onComplete, participantName, onSubmitAnswer, showResultShortcut = true }) {
   const fallback = starterQuizzes[0].questions[0];
   const quizQuestions = quiz?.questions.length ? quiz.questions : [fallback];
   const [activeQuestionIndex, setActiveQuestionIndex] = useState(0);
@@ -1375,7 +1385,7 @@ function PlayPage({ quiz, onComplete, participantName, onSubmitAnswer }) {
 
   return (
     <section className="page play-page classroom-scene">
-      <button className="result-shortcut" type="button" onClick={onComplete}>Lihat Hasil</button>
+      {showResultShortcut && <button className="result-shortcut" type="button" onClick={onComplete}>Lihat Hasil</button>}
       {showIntro ? (
         <div className="question-intro">Pertanyaan {activeQuestionIndex + 1}...</div>
       ) : (
@@ -1415,20 +1425,32 @@ function PlayPage({ quiz, onComplete, participantName, onSubmitAnswer }) {
   );
 }
 
-function ResultPage({ onNavigate, leaderboard }) {
+function ResultPage({ onNavigate, leaderboard, onBack, backLabel = 'Kembali ke beranda' }) {
   const topScores = leaderboard.length ? leaderboard.slice(0, 3) : [
     { id: 'empty-1', name: 'Belum ada hasil', score: 0 },
   ];
 
   return (
     <section className="page result-page classroom-page">
-      <button className="back-home" type="button" onClick={() => onNavigate('home')}>Kembali ke beranda</button>
+      <button className="back-home" type="button" onClick={onBack || (() => onNavigate('home'))}>{backLabel}</button>
       <div className="score-board">
         {topScores.map((participant, index) => (
           <div className={`score-bar ${['red', 'blue', 'green'][index] || 'blue'}`} key={participant.id} style={{ height: `${Math.max(100, 90 + participant.score * 45)}px` }}>
             <span>{participant.name} ({participant.score})</span>
           </div>
         ))}
+      </div>
+    </section>
+  );
+}
+
+function AssignmentDonePage({ onNavigate }) {
+  return (
+    <section className="page classroom-page assignment-done-page">
+      <div className="assignment-done-card">
+        <h2>Tugas kuis selesai</h2>
+        <p>Jawaban kamu sudah tersimpan. Hasil tugas akan masuk ke laporan pengajar.</p>
+        <button type="button" onClick={() => onNavigate('home')}>Kembali ke beranda</button>
       </div>
     </section>
   );
@@ -1460,6 +1482,8 @@ export default function App() {
   const [leaderboard, setLeaderboard] = useState([]);
   const [currentUser, setCurrentUser] = useState(() => JSON.parse(window.localStorage.getItem('smartq-session') || 'null'));
   const [quizRole, setQuizRole] = useState('');
+  const [pendingDeleteQuiz, setPendingDeleteQuiz] = useState(null);
+  const [pendingDeleteReport, setPendingDeleteReport] = useState(null);
 
   const activeQuiz = quizzes.find((quiz) => quiz.id === activeQuizId) || quizzes[0];
   const assigningQuiz = quizzes.find((quiz) => quiz.id === assigningQuizId);
@@ -1751,11 +1775,16 @@ export default function App() {
     }
   };
 
-  const handleDeleteQuiz = async (id) => {
-    if (!window.confirm('Hapus kuis ini beserta seluruh soal dan hasilnya?')) {
+  const handleDeleteQuiz = (id) => {
+    setPendingDeleteQuiz(quizzes.find((quiz) => quiz.id === id) || null);
+  };
+
+  const handleConfirmDeleteQuiz = async () => {
+    if (!pendingDeleteQuiz) {
       return;
     }
 
+    const id = pendingDeleteQuiz.id;
     if (isBackendId(id)) {
       try {
         await requestJson(`/api/quizzes/${id}`, {
@@ -1776,6 +1805,43 @@ export default function App() {
 
       return nextQuizzes;
     });
+    setPendingDeleteQuiz(null);
+  };
+
+  const handleDeleteReport = (report) => {
+    setPendingDeleteReport(report);
+  };
+
+  const handleConfirmDeleteReport = async () => {
+    if (!pendingDeleteReport) {
+      return;
+    }
+
+    try {
+      if (pendingDeleteReport.type === 'live') {
+        const payload = await requestJson(`/api/quizzes/${pendingDeleteReport.quizId}/live-report`, {
+          method: 'DELETE',
+        });
+        const updatedQuiz = normalizeBackendQuiz(payload.data);
+        setQuizzes((current) => current.map((quiz) => (quiz.id === updatedQuiz.id ? updatedQuiz : quiz)));
+        if (selectedAssignment?.type === 'live' && String(selectedAssignment.quizId) === String(pendingDeleteReport.quizId)) {
+          setSelectedAssignment(null);
+          setAssignmentResults([]);
+        }
+      } else {
+        await requestJson(`/api/assignments/${pendingDeleteReport.assignmentId}`, {
+          method: 'DELETE',
+        });
+        setAssignments((current) => current.filter((assignment) => assignment.id !== String(pendingDeleteReport.assignmentId)));
+        if (selectedAssignment?.type === 'assigned' && String(selectedAssignment.id) === String(pendingDeleteReport.assignmentId)) {
+          setSelectedAssignment(null);
+          setAssignmentResults([]);
+        }
+      }
+      setPendingDeleteReport(null);
+    } catch (error) {
+      console.info('Laporan belum berhasil dihapus.', error);
+    }
   };
 
   const handleJoinQuiz = async (pin) => {
@@ -1898,6 +1964,13 @@ export default function App() {
   };
 
   const handleCompleteQuiz = async () => {
+    if (quizRole === 'participant' && participantAssignmentId) {
+      setParticipantAssignmentId('');
+      setParticipantId('');
+      navigateTo('assignment-done');
+      return;
+    }
+
     if (quizRole === 'host' && isBackendId(activeQuizId)) {
       try {
         const payload = await requestJson(`/api/quizzes/${activeQuizId}/finish`, { method: 'PUT' });
@@ -1981,6 +2054,7 @@ export default function App() {
           onLogout={handleLogout}
           onViewAssignmentResult={handleViewAssignmentResult}
           onViewLiveResult={handleViewLiveResult}
+          onDeleteReport={handleDeleteReport}
         />
       )}
       {page === 'assignment-result' && (
@@ -2007,10 +2081,58 @@ export default function App() {
           </div>
         </section>
       )}
-      {page === 'play' && <PlayPage quiz={activeQuiz} onComplete={handleCompleteQuiz} participantName={participantName} onSubmitAnswer={handleSubmitAnswer} />}
-      {page === 'result' && <ResultPage onNavigate={navigateTo} leaderboard={leaderboard} />}
+      {page === 'play' && (
+        <PlayPage
+          quiz={activeQuiz}
+          onComplete={handleCompleteQuiz}
+          participantName={participantName}
+          onSubmitAnswer={handleSubmitAnswer}
+          showResultShortcut={!participantAssignmentId}
+        />
+      )}
+      {page === 'assignment-done' && <AssignmentDonePage onNavigate={navigateTo} />}
+      {page === 'result' && (
+        <ResultPage
+          onNavigate={navigateTo}
+          leaderboard={leaderboard}
+          backLabel={quizRole === 'host' ? 'Kembali ke halaman pengajar' : 'Kembali ke beranda'}
+          onBack={quizRole === 'host' ? () => {
+            setActivePanel('laporan');
+            navigateTo('dashboard');
+          } : undefined}
+        />
+      )}
       {showCreateModal && <CreateQuizModal onClose={() => setShowCreateModal(false)} onSubmit={handleCreateQuiz} />}
       {assigningQuiz && <AssignQuizModal quiz={assigningQuiz} onClose={() => setAssigningQuizId('')} onSubmit={handleCreateAssignment} />}
+      {pendingDeleteQuiz && (
+        <div className="confirm-modal-layer">
+          <section className="confirm-modal" role="dialog" aria-modal="true" aria-labelledby="delete-quiz-title">
+            <span>Konfirmasi hapus</span>
+            <h2 id="delete-quiz-title">Hapus {pendingDeleteQuiz.title}?</h2>
+            <p>Kuis, soal, peserta, dan laporan yang terhubung akan ikut terhapus. Data ini tidak bisa dikembalikan.</p>
+            <div className="confirm-actions">
+              <button className="confirm-cancel" type="button" onClick={() => setPendingDeleteQuiz(null)}>Batal</button>
+              <button className="confirm-danger" type="button" onClick={handleConfirmDeleteQuiz}>Ya, hapus</button>
+            </div>
+          </section>
+        </div>
+      )}
+      {pendingDeleteReport && (
+        <div className="confirm-modal-layer">
+          <section className="confirm-modal" role="dialog" aria-modal="true" aria-labelledby="delete-report-title">
+            <span>Konfirmasi hapus</span>
+            <h2 id="delete-report-title">Hapus {pendingDeleteReport.type === 'live' ? 'hasil live' : 'laporan tugas'}?</h2>
+            <p>
+              Data laporan {pendingDeleteReport.title} akan dihapus dari halaman laporan.
+              Kuis dan soal tetap tersimpan di pustaka.
+            </p>
+            <div className="confirm-actions">
+              <button className="confirm-cancel" type="button" onClick={() => setPendingDeleteReport(null)}>Batal</button>
+              <button className="confirm-danger" type="button" onClick={handleConfirmDeleteReport}>Ya, hapus</button>
+            </div>
+          </section>
+        </div>
+      )}
     </>
   );
 }

@@ -332,16 +332,18 @@ button:disabled {
   margin-top: 15px;
   border: 0;
   border-radius: 7px;
-  background: var(--cyan);
-  color: #e7e7e7;
+  background: #86b7c8;
+  color: #eef4f7;
   font-size: 1.15rem;
   font-weight: 900;
+  box-shadow: none;
+  transition: background .18s ease, box-shadow .18s ease, opacity .18s ease;
 }
 
 .primary-button:not(:disabled) {
-  background: #2c9fbe;
+  background: #18a9cf;
   color: #fff;
-  box-shadow: 0 7px 14px rgba(7, 81, 144, .18);
+  box-shadow: 0 10px 18px rgba(7, 81, 144, .28);
 }
 
 .auth-card p {
@@ -783,10 +785,69 @@ button:disabled {
   text-decoration: none !important;
 }
 
+.report-delete-button {
+  grid-column: 1 / -1;
+  width: 100%;
+  min-height: 38px;
+  padding: 0 16px;
+  border: 2px solid #b80d2d !important;
+  border-radius: 6px !important;
+  background: transparent !important;
+  color: #b80d2d !important;
+  text-align: center !important;
+  text-decoration: none !important;
+}
+
+.report-delete-button:hover,
+.report-delete-button:focus-visible {
+  background: #b80d2d !important;
+  color: #fff !important;
+  text-decoration: none !important;
+}
+
 .assignment-result-content {
   min-height: calc(100vh - 58px);
   padding: 28px;
   background: var(--blue-dark);
+}
+
+.assignment-done-page {
+  display: grid;
+  place-items: center;
+  min-height: 100vh;
+  padding: 24px;
+}
+
+.assignment-done-card {
+  width: min(440px, 100%);
+  padding: 30px;
+  border-radius: 10px;
+  background: var(--card);
+  text-align: center;
+  box-shadow: 0 22px 46px rgba(0, 0, 0, .24);
+}
+
+.assignment-done-card h2 {
+  margin: 0 0 12px;
+  font-size: 1.7rem;
+}
+
+.assignment-done-card p {
+  margin: 0;
+  color: var(--blue);
+  font-weight: 900;
+  line-height: 1.5;
+}
+
+.assignment-done-card button {
+  width: 100%;
+  min-height: 44px;
+  margin-top: 22px;
+  border: 0;
+  border-radius: 7px;
+  background: var(--blue);
+  color: #fff;
+  font-weight: 900;
 }
 
 .assignment-result-card {
@@ -956,6 +1017,67 @@ button:disabled {
 .assignment-submit {
   background: #3d87b2;
   color: #e7e7e7;
+}
+
+.confirm-modal-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  padding: 22px;
+  background: rgba(0, 0, 0, .46);
+}
+
+.confirm-modal {
+  width: min(420px, 100%);
+  padding: 26px;
+  border-radius: 10px;
+  background: var(--card);
+  box-shadow: 0 24px 48px rgba(0, 0, 0, .28);
+}
+
+.confirm-modal span {
+  color: #b80d2d;
+  font-size: .88rem;
+  font-weight: 900;
+}
+
+.confirm-modal h2 {
+  margin: 8px 0 10px;
+  font-size: 1.55rem;
+}
+
+.confirm-modal p {
+  margin: 0;
+  color: #2a2a2a;
+  font-weight: 800;
+  line-height: 1.5;
+}
+
+.confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 22px;
+}
+
+.confirm-actions button {
+  min-width: 112px;
+  height: 42px;
+  border: 0;
+  border-radius: 7px;
+  font-weight: 900;
+}
+
+.confirm-cancel {
+  background: #d7d7d7;
+  color: #161616;
+}
+
+.confirm-danger {
+  background: #b80d2d;
+  color: #fff;
 }
 
 .modal {
