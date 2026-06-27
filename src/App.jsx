@@ -1315,7 +1315,7 @@ function AssignmentResultPage({ assignment, participants, loading, onBack }) {
   );
 }
 
-function PlayPage({ quiz, onComplete, participantName, onSubmitAnswer }) {
+function PlayPage({ quiz, onComplete, participantName, onSubmitAnswer, showResultShortcut = true }) {
   const fallback = starterQuizzes[0].questions[0];
   const quizQuestions = quiz?.questions.length ? quiz.questions : [fallback];
   const [activeQuestionIndex, setActiveQuestionIndex] = useState(0);
@@ -1385,7 +1385,7 @@ function PlayPage({ quiz, onComplete, participantName, onSubmitAnswer }) {
 
   return (
     <section className="page play-page classroom-scene">
-      <button className="result-shortcut" type="button" onClick={onComplete}>Lihat Hasil</button>
+      {showResultShortcut && <button className="result-shortcut" type="button" onClick={onComplete}>Lihat Hasil</button>}
       {showIntro ? (
         <div className="question-intro">Pertanyaan {activeQuestionIndex + 1}...</div>
       ) : (
@@ -1439,6 +1439,18 @@ function ResultPage({ onNavigate, leaderboard, onBack, backLabel = 'Kembali ke b
             <span>{participant.name} ({participant.score})</span>
           </div>
         ))}
+      </div>
+    </section>
+  );
+}
+
+function AssignmentDonePage({ onNavigate }) {
+  return (
+    <section className="page classroom-page assignment-done-page">
+      <div className="assignment-done-card">
+        <h2>Tugas kuis selesai</h2>
+        <p>Jawaban kamu sudah tersimpan. Hasil tugas akan masuk ke laporan pengajar.</p>
+        <button type="button" onClick={() => onNavigate('home')}>Kembali ke beranda</button>
       </div>
     </section>
   );
@@ -1952,6 +1964,13 @@ export default function App() {
   };
 
   const handleCompleteQuiz = async () => {
+    if (quizRole === 'participant' && participantAssignmentId) {
+      setParticipantAssignmentId('');
+      setParticipantId('');
+      navigateTo('assignment-done');
+      return;
+    }
+
     if (quizRole === 'host' && isBackendId(activeQuizId)) {
       try {
         const payload = await requestJson(`/api/quizzes/${activeQuizId}/finish`, { method: 'PUT' });
@@ -2062,7 +2081,16 @@ export default function App() {
           </div>
         </section>
       )}
-      {page === 'play' && <PlayPage quiz={activeQuiz} onComplete={handleCompleteQuiz} participantName={participantName} onSubmitAnswer={handleSubmitAnswer} />}
+      {page === 'play' && (
+        <PlayPage
+          quiz={activeQuiz}
+          onComplete={handleCompleteQuiz}
+          participantName={participantName}
+          onSubmitAnswer={handleSubmitAnswer}
+          showResultShortcut={!participantAssignmentId}
+        />
+      )}
+      {page === 'assignment-done' && <AssignmentDonePage onNavigate={navigateTo} />}
       {page === 'result' && (
         <ResultPage
           onNavigate={navigateTo}
