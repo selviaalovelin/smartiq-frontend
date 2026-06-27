@@ -18,8 +18,13 @@ import {
   FaTrash,
   FaUserCircle,
   FaUserPlus,
+  FaEye,
+  FaEyeSlash,
 } from 'react-icons/fa';
 import { BsThreeDotsVertical } from 'react-icons/bs';
+
+const TEACHER_IDLE_LIMIT = 15 * 60 * 1000;
+const TEACHER_ACTIVITY_EVENTS = ['click', 'keydown', 'mousemove', 'touchstart', 'scroll'];
 
 const starterQuizzes = [
   {
@@ -71,6 +76,7 @@ const normalizeBackendAssignment = (assignment) => {
     id: String(assignment.id),
     quizId: String(assignment.quiz_id),
     title: quiz.title || 'Kuis',
+    totalQuestions: quiz.questions?.length || 0,
     startDate: Number.isNaN(createdAt.valueOf()) ? '-' : createdAt.toLocaleDateString('id-ID'),
     endDate: Number.isNaN(deadline.valueOf()) ? assignment.deadline : deadline.toLocaleDateString('id-ID'),
     endTime: Number.isNaN(deadline.valueOf()) ? '' : deadline.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
@@ -158,6 +164,25 @@ const formatCreatedDate = (value) => {
     day: '2-digit',
     month: 'short',
     year: 'numeric',
+  });
+};
+
+const formatDateTime = (value) => {
+  if (!value) {
+    return '-';
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.valueOf())) {
+    return '-';
+  }
+
+  return date.toLocaleString('id-ID', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
   });
 };
 
@@ -314,6 +339,7 @@ function AuthPage({ mode, onNavigate, onAuthenticate }) {
   const [submitted, setSubmitted] = useState(false);
   const [touched, setTouched] = useState({});
   const [serverError, setServerError] = useState('');
+  const [visiblePassword, setVisiblePassword] = useState({ password: false, confirmPassword: false });
 
   const errors = {
     email: !form.email.trim()
@@ -345,6 +371,10 @@ function AuthPage({ mode, onNavigate, onAuthenticate }) {
   const updateField = (field, value) => {
     setForm((current) => ({ ...current, [field]: value }));
     setServerError('');
+  };
+
+  const togglePassword = (field) => {
+    setVisiblePassword((current) => ({ ...current, [field]: !current[field] }));
   };
 
   const handleSubmit = async (event) => {
@@ -381,29 +411,47 @@ function AuthPage({ mode, onNavigate, onAuthenticate }) {
         <FieldError message={showError('email')} />
 
         <label>Kata Sandi:</label>
-        <input
-          className={showError('password') ? 'input-error' : ''}
-          type="password"
-          value={form.password}
-          onBlur={() => setTouched((current) => ({ ...current, password: true }))}
-          maxLength={MAX_PASSWORD_LENGTH}
-          onChange={(event) => updateField('password', event.target.value)}
-          placeholder="Masukkan Kata Sandi Anda"
-        />
+        <div className="password-field">
+          <input
+            className={showError('password') ? 'input-error' : ''}
+            type={visiblePassword.password ? 'text' : 'password'}
+            value={form.password}
+            onBlur={() => setTouched((current) => ({ ...current, password: true }))}
+            maxLength={MAX_PASSWORD_LENGTH}
+            onChange={(event) => updateField('password', event.target.value)}
+            placeholder="Masukkan Kata Sandi Anda"
+          />
+          <button
+            aria-label={visiblePassword.password ? 'Sembunyikan kata sandi' : 'Lihat kata sandi'}
+            type="button"
+            onClick={() => togglePassword('password')}
+          >
+            {visiblePassword.password ? <FaEyeSlash /> : <FaEye />}
+          </button>
+        </div>
         <FieldError message={showError('password')} />
 
         {isRegister && (
           <>
             <label>Konfirmasi Kata Sandi:</label>
-            <input
-              className={showError('confirmPassword') ? 'input-error' : ''}
-              type="password"
-              value={form.confirmPassword}
-              onBlur={() => setTouched((current) => ({ ...current, confirmPassword: true }))}
-              maxLength={MAX_PASSWORD_LENGTH}
-              onChange={(event) => updateField('confirmPassword', event.target.value)}
-              placeholder="Konfirmasi Kata Sandi Anda"
-            />
+            <div className="password-field">
+              <input
+                className={showError('confirmPassword') ? 'input-error' : ''}
+                type={visiblePassword.confirmPassword ? 'text' : 'password'}
+                value={form.confirmPassword}
+                onBlur={() => setTouched((current) => ({ ...current, confirmPassword: true }))}
+                maxLength={MAX_PASSWORD_LENGTH}
+                onChange={(event) => updateField('confirmPassword', event.target.value)}
+                placeholder="Konfirmasi Kata Sandi Anda"
+              />
+              <button
+                aria-label={visiblePassword.confirmPassword ? 'Sembunyikan konfirmasi kata sandi' : 'Lihat konfirmasi kata sandi'}
+                type="button"
+                onClick={() => togglePassword('confirmPassword')}
+              >
+                {visiblePassword.confirmPassword ? <FaEyeSlash /> : <FaEye />}
+              </button>
+            </div>
             <FieldError message={showError('confirmPassword')} />
           </>
         )}
@@ -422,7 +470,7 @@ function AuthPage({ mode, onNavigate, onAuthenticate }) {
   );
 }
 
-function DashboardPage({ quizzes, assignments, activePanel, setActivePanel, onCreate, onEdit, onStartLive, onAssign, onDelete, onLogout }) {
+function DashboardPage({ quizzes, assignments, activePanel, setActivePanel, onCreate, onEdit, onStartLive, onAssign, onDelete, onLogout, onViewAssignmentResult }) {
   const [keyword, setKeyword] = useState('');
   const [openMenuId, setOpenMenuId] = useState('');
   const [copiedValue, setCopiedValue] = useState('');
@@ -430,19 +478,19 @@ function DashboardPage({ quizzes, assignments, activePanel, setActivePanel, onCr
   const totalQuestions = quizzes.reduce((total, quiz) => total + quiz.questions.length, 0);
   const today = new Date().toDateString();
   const createdToday = quizzes.filter((quiz) => quiz.createdAt && new Date(quiz.createdAt).toDateString() === today).length;
-  const finishedReports = assignments.length;
+  const finishedReports = quizzes.filter((quiz) => quiz.status === 'finished').length;
   const filteredQuizzes = quizzes.filter((quiz) => (
     `${quiz.title} ${quiz.category} ${formatCreatedDate(quiz.createdAt)}`
       .toLowerCase()
       .includes(keyword.toLowerCase())
   ));
 
-  const groupedReports = useMemo(() => {
-    return quizzes.reduce((result, quiz) => {
-      result[quiz.category] = (result[quiz.category] || 0) + quiz.questions.length;
-      return result;
-    }, {});
-  }, [quizzes]);
+  const reportColumns = useMemo(() => {
+    return quizzes.map((quiz) => ({
+      quiz,
+      reports: assignments.filter((assignment) => String(assignment.quizId) === String(quiz.id)),
+    }));
+  }, [quizzes, assignments]);
 
   const copyText = async (value) => {
     try {
@@ -553,27 +601,33 @@ function DashboardPage({ quizzes, assignments, activePanel, setActivePanel, onCr
 
           {activePanel === 'laporan' && (
             <div className="report-grid">
-              {Object.entries(groupedReports).map(([category, count]) => (
-                <article className="report-card" key={category}>
-                  <h3>{category}</h3>
-                  <strong>{count ? `${count} Soal Tersedia` : 'Belum Tersedia Soal'}</strong>
-                  <button type="button" onClick={() => setActivePanel('pustaka')}>Lihat Selengkapnya</button>
-                </article>
-              ))}
-              {assignments.map((assignment) => (
-                <article className="assignment-report-card" key={assignment.id}>
-                  <div>
-                    <span>Laporan</span>
-                    <strong>{assignment.title}</strong>
-                  </div>
-                  <dl>
-                    <div><dt>Tanggal mulai:</dt><dd>{assignment.startDate}</dd></div>
-                    <div><dt>Tanggal selesai:</dt><dd>{assignment.endDate}</dd></div>
-                    <div><dt>Diselenggarakan oleh:</dt><dd>{assignment.host}</dd></div>
-                    <div><dt>Pin game:</dt><dd>{assignment.pin}</dd><button type="button" onClick={() => copyText(assignment.pin)}>{copiedValue === assignment.pin ? 'Tersalin' : 'Salin'}</button></div>
-                    <div><dt>URL:</dt><dd>{assignment.url}</dd><button type="button" onClick={() => copyText(assignment.url)}>{copiedValue === assignment.url ? 'Tersalin' : 'Salin'}</button></div>
-                  </dl>
-                </article>
+              {reportColumns.map(({ quiz, reports }) => (
+                <div className="report-column" key={quiz.id}>
+                  <article className="report-card">
+                    <h3>{quiz.category || quiz.title}</h3>
+                    <strong>{quiz.questions.length ? `${quiz.questions.length} Soal Tersedia` : 'Belum Tersedia Soal'}</strong>
+                    <button type="button" onClick={() => setActivePanel('pustaka')}>Lihat Selengkapnya</button>
+                  </article>
+
+                  {reports.map((assignment) => (
+                    <article className="assignment-report-card" key={assignment.id}>
+                      <div>
+                        <span>Laporan</span>
+                        <strong>{assignment.title}</strong>
+                      </div>
+                      <dl>
+                        <div><dt>Tanggal mulai:</dt><dd>{assignment.startDate}</dd></div>
+                        <div><dt>Tanggal selesai:</dt><dd>{assignment.endDate}</dd></div>
+                        <div><dt>Diselenggarakan oleh:</dt><dd>{assignment.host}</dd></div>
+                        <div><dt>Pin game:</dt><dd>{assignment.pin}</dd><button type="button" onClick={() => copyText(assignment.pin)}>{copiedValue === assignment.pin ? 'Tersalin' : 'Salin'}</button></div>
+                        <div><dt>URL:</dt><dd>{assignment.url}</dd><button type="button" onClick={() => copyText(assignment.url)}>{copiedValue === assignment.url ? 'Tersalin' : 'Salin'}</button></div>
+                      </dl>
+                      <button className="assignment-result-button" type="button" onClick={() => onViewAssignmentResult(assignment)}>
+                        Lihat hasil
+                      </button>
+                    </article>
+                  ))}
+                </div>
               ))}
             </div>
           )}
@@ -1021,6 +1075,64 @@ function HostMonitorPage({ quiz, participants, onFinish }) {
   );
 }
 
+function AssignmentResultPage({ assignment, participants, loading, onBack }) {
+  const totalQuestions = assignment?.totalQuestions || participants[0]?.total_questions || 0;
+
+  return (
+    <section className="page dashboard-page assignment-result-page">
+      <header className="dashboard-header">
+        <Brand />
+        <button className="create-button" type="button" onClick={onBack}>Kembali</button>
+      </header>
+
+      <main className="assignment-result-content">
+        <section className="assignment-result-card">
+          <div className="assignment-result-head">
+            <div>
+              <span>Hasil tugas kuis</span>
+              <h1>{assignment?.title || 'Kuis'}</h1>
+              <p>PIN {assignment?.pin || '-'} - batas {assignment?.endDate || '-'}</p>
+            </div>
+            <strong>{participants.length} peserta</strong>
+          </div>
+
+          <div className="result-detail-table">
+            <div className="result-detail-row head">
+              <strong>Peserta</strong>
+              <strong>Mulai</strong>
+              <strong>Terakhir</strong>
+              <strong>Dikerjakan</strong>
+              <strong>Benar</strong>
+              <strong>Salah</strong>
+            </div>
+            {participants.map((participant) => {
+              const answered = participant.answered_count || 0;
+              const correct = participant.correct_count ?? participant.score ?? 0;
+              const wrong = participant.wrong_count ?? Math.max(0, answered - correct);
+
+              return (
+                <div className="result-detail-row" key={participant.id}>
+                  <strong>{participant.name}</strong>
+                  <span>{formatDateTime(participant.created_at)}</span>
+                  <span>{formatDateTime(participant.updated_at)}</span>
+                  <span>{answered}/{totalQuestions || '-'}</span>
+                  <span className="correct-count">{correct}</span>
+                  <span className="wrong-count">{wrong}</span>
+                </div>
+              );
+            })}
+            {!participants.length && (
+              <p className="result-detail-empty">
+                {loading ? 'Memuat hasil peserta...' : 'Belum ada peserta yang mengerjakan tugas ini.'}
+              </p>
+            )}
+          </div>
+        </section>
+      </main>
+    </section>
+  );
+}
+
 function PlayPage({ quiz, onComplete, participantName, onSubmitAnswer }) {
   const fallback = starterQuizzes[0].questions[0];
   const quizQuestions = quiz?.questions.length ? quiz.questions : [fallback];
@@ -1159,6 +1271,9 @@ export default function App() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [assigningQuizId, setAssigningQuizId] = useState('');
   const [assignments, setAssignments] = useState([]);
+  const [selectedAssignment, setSelectedAssignment] = useState(null);
+  const [assignmentResults, setAssignmentResults] = useState([]);
+  const [assignmentResultsLoading, setAssignmentResultsLoading] = useState(false);
   const [participantPin, setParticipantPin] = useState('');
   const [participantName, setParticipantName] = useState('');
   const [participantId, setParticipantId] = useState('');
@@ -1254,8 +1369,9 @@ export default function App() {
   }, [currentUser]);
 
   const handleAuthenticate = (user) => {
-    window.localStorage.setItem('smartq-session', JSON.stringify(user));
-    setCurrentUser(user);
+    const activeSession = { ...user, lastActivity: Date.now() };
+    window.localStorage.setItem('smartq-session', JSON.stringify(activeSession));
+    setCurrentUser(activeSession);
   };
 
   const handleLogout = async () => {
@@ -1277,6 +1393,68 @@ export default function App() {
     setShowCreateModal(false);
     navigateTo('login', { replace: true });
   };
+
+  useEffect(() => {
+    if (!currentUser) {
+      return undefined;
+    }
+
+    let timeoutId;
+    let lastRecordedActivity = 0;
+
+    const readSession = () => JSON.parse(window.localStorage.getItem('smartq-session') || 'null');
+
+    const expireSession = async () => {
+      try {
+        await requestJson('/api/auth/logout', { method: 'POST' });
+      } catch {
+        // Saat koneksi backend terputus, sesi lokal tetap harus berakhir.
+      }
+      clearExpiredSession();
+    };
+
+    const scheduleExpiry = () => {
+      window.clearTimeout(timeoutId);
+      const session = readSession();
+      const lastActivity = session?.lastActivity || Date.now();
+      const remainingTime = Math.max(0, TEACHER_IDLE_LIMIT - (Date.now() - lastActivity));
+      timeoutId = window.setTimeout(expireSession, remainingTime);
+    };
+
+    const recordActivity = () => {
+      const now = Date.now();
+      if (now - lastRecordedActivity < 1000) {
+        return;
+      }
+
+      lastRecordedActivity = now;
+      const session = readSession();
+      if (!session?.token) {
+        return;
+      }
+
+      window.localStorage.setItem('smartq-session', JSON.stringify({ ...session, lastActivity: now }));
+      scheduleExpiry();
+    };
+
+    const storedSession = readSession();
+    if (!storedSession?.token || (storedSession.lastActivity && Date.now() - storedSession.lastActivity >= TEACHER_IDLE_LIMIT)) {
+      expireSession();
+      return undefined;
+    }
+
+    recordActivity();
+    TEACHER_ACTIVITY_EVENTS.forEach((eventName) => {
+      window.addEventListener(eventName, recordActivity, { passive: true });
+    });
+
+    return () => {
+      window.clearTimeout(timeoutId);
+      TEACHER_ACTIVITY_EVENTS.forEach((eventName) => {
+        window.removeEventListener(eventName, recordActivity);
+      });
+    };
+  }, [currentUser]);
 
   const handleCreateQuiz = async ({ title, category }) => {
     const quizTitle = title || `Soal Quiz ${quizzes.length + 1}`;
@@ -1330,6 +1508,23 @@ export default function App() {
 
   const handleAssignQuiz = (id) => {
     setAssigningQuizId(id);
+  };
+
+  const handleViewAssignmentResult = async (assignment) => {
+    setSelectedAssignment(assignment);
+    setAssignmentResults([]);
+    setAssignmentResultsLoading(true);
+    navigateTo('assignment-result');
+
+    try {
+      const payload = await requestJson(`/api/quizzes/${assignment.quizId}/participants`);
+      setAssignmentResults(payload.data || []);
+    } catch (error) {
+      console.info('Hasil tugas belum dapat dimuat.', error);
+      setAssignmentResults([]);
+    } finally {
+      setAssignmentResultsLoading(false);
+    }
   };
 
   const handleCreateAssignment = async (assignment) => {
@@ -1456,7 +1651,9 @@ export default function App() {
   const handleCompleteQuiz = async () => {
     if (quizRole === 'host' && isBackendId(activeQuizId)) {
       try {
-        await requestJson(`/api/quizzes/${activeQuizId}/finish`, { method: 'PUT' });
+        const payload = await requestJson(`/api/quizzes/${activeQuizId}/finish`, { method: 'PUT' });
+        const finishedQuiz = normalizeBackendQuiz(payload.data);
+        setQuizzes((current) => current.map((quiz) => quiz.id === activeQuizId ? finishedQuiz : quiz));
       } catch (error) {
         console.info('Status selesai belum dapat disimpan.', error);
       }
@@ -1531,6 +1728,18 @@ export default function App() {
           onAssign={handleAssignQuiz}
           onDelete={handleDeleteQuiz}
           onLogout={handleLogout}
+          onViewAssignmentResult={handleViewAssignmentResult}
+        />
+      )}
+      {page === 'assignment-result' && (
+        <AssignmentResultPage
+          assignment={selectedAssignment}
+          participants={assignmentResults}
+          loading={assignmentResultsLoading}
+          onBack={() => {
+            setActivePanel('laporan');
+            navigateTo('dashboard');
+          }}
         />
       )}
       {page === 'participant-waiting' && <ParticipantWaitingPage pin={participantPin} participantName={participantName} onReady={() => navigateTo('play', { replace: true })} />}
