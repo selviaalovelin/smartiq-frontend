@@ -393,6 +393,8 @@ button:disabled {
 }
 
 .dashboard-page {
+  height: 100vh;
+  overflow: hidden;
   background: var(--blue-dark);
 }
 
@@ -444,11 +446,13 @@ button:disabled {
 
 .dashboard-body {
   display: grid;
-  min-height: calc(100vh - 58px);
+  height: calc(100vh - 58px);
+  min-height: 0;
   grid-template-columns: 230px 1fr;
 }
 
 .sidebar {
+  min-height: 0;
   background: var(--card);
 }
 
@@ -475,6 +479,8 @@ button:disabled {
 .dashboard-content {
   position: relative;
   z-index: 1;
+  min-height: 0;
+  overflow-y: auto;
   padding: 28px;
 }
 
@@ -1230,7 +1236,8 @@ button:disabled {
 }
 
 .editor-form {
-  min-height: 100vh;
+  height: 100vh;
+  overflow: hidden;
 }
 
 .editor-loading-page {
@@ -1329,11 +1336,15 @@ button:disabled {
 
 .editor-body {
   display: grid;
-  min-height: calc(100vh - 66px);
+  height: calc(100vh - 66px);
+  min-height: 0;
   grid-template-columns: 304px 1fr;
+  overflow: hidden;
 }
 
 .question-sidebar {
+  min-height: 0;
+  overflow-y: auto;
   padding: 16px;
   background: var(--card);
 }
@@ -1374,6 +1385,8 @@ button:disabled {
 .question-canvas {
   position: relative;
   z-index: 1;
+  min-height: 0;
+  overflow: hidden;
   padding: 16px 46px 28px 20px;
 }
 
@@ -1994,9 +2007,34 @@ button:disabled {
 }
 
 @media (max-width: 760px) {
+  .dashboard-page {
+    height: auto;
+    min-height: 100vh;
+    overflow: visible;
+  }
+
   .dashboard-body,
   .editor-body {
     grid-template-columns: 1fr;
+  }
+
+  .dashboard-body {
+    height: auto;
+  }
+
+  .editor-form,
+  .editor-body {
+    height: auto;
+    overflow: visible;
+  }
+
+  .dashboard-content {
+    overflow: visible;
+  }
+
+  .question-sidebar,
+  .question-canvas {
+    overflow: visible;
   }
 
   .sidebar {
