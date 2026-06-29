@@ -50,6 +50,8 @@ const starterQuizzes = [
 ];
 
 const isBackendId = (id) => /^\d+$/.test(String(id));
+const SESSION_COOKIE_NAME = 'smartq_session';
+
 const normalizeBackendQuiz = (quiz) => ({
     id: String(quiz.id),
     title: quiz.title,
@@ -86,8 +88,55 @@ const normalizeBackendAssignment = (assignment) => {
   };
 };
 
+const cookieSecureFlag = () => (window.location.protocol === 'https:' ? '; Secure' : '');
+
+const readCookie = (name) => {
+  const cookie = document.cookie
+    .split('; ')
+    .find((row) => row.startsWith(`${name}=`));
+
+  return cookie ? cookie.slice(name.length + 1) : '';
+};
+
+const clearStoredSession = () => {
+  document.cookie = `${SESSION_COOKIE_NAME}=; Max-Age=0; Path=/; SameSite=Lax${cookieSecureFlag()}`;
+  window.localStorage.removeItem('smartq-session');
+};
+
+const saveStoredSession = (session) => {
+  const encodedSession = encodeURIComponent(JSON.stringify(session));
+  document.cookie = `${SESSION_COOKIE_NAME}=${encodedSession}; Max-Age=${Math.floor(TEACHER_IDLE_LIMIT / 1000)}; Path=/; SameSite=Lax${cookieSecureFlag()}`;
+  window.localStorage.removeItem('smartq-session');
+};
+
+const getStoredSession = () => {
+  const cookieSession = readCookie(SESSION_COOKIE_NAME);
+  if (cookieSession) {
+    try {
+      return JSON.parse(decodeURIComponent(cookieSession));
+    } catch {
+      clearStoredSession();
+      return null;
+    }
+  }
+
+  const legacySession = window.localStorage.getItem('smartq-session');
+  if (!legacySession) {
+    return null;
+  }
+
+  try {
+    const parsedSession = JSON.parse(legacySession);
+    saveStoredSession(parsedSession);
+    return parsedSession;
+  } catch {
+    clearStoredSession();
+    return null;
+  }
+};
+
 async function requestJson(path, options = {}) {
-  const session = JSON.parse(window.localStorage.getItem('smartq-session') || 'null');
+  const session = getStoredSession();
   const response = await fetch(path, {
     headers: {
       Accept: 'application/json',
@@ -1480,7 +1529,7 @@ export default function App() {
   const [livePin, setLivePin] = useState('');
   const [liveParticipants, setLiveParticipants] = useState([]);
   const [leaderboard, setLeaderboard] = useState([]);
-  const [currentUser, setCurrentUser] = useState(() => JSON.parse(window.localStorage.getItem('smartq-session') || 'null'));
+  const [currentUser, setCurrentUser] = useState(() => getStoredSession());
   const [quizRole, setQuizRole] = useState('');
   const [pendingDeleteQuiz, setPendingDeleteQuiz] = useState(null);
   const [pendingDeleteReport, setPendingDeleteReport] = useState(null);
@@ -1543,7 +1592,7 @@ export default function App() {
       } catch (error) {
         console.info('Data kuis belum dapat dimuat.', error);
         if (error.status === 401) {
-          window.localStorage.removeItem('smartq-session');
+          clearStoredSession();
           setCurrentUser(null);
           navigateTo('login', { replace: true });
         }
@@ -1572,7 +1621,7 @@ export default function App() {
 
   const handleAuthenticate = (user) => {
     const activeSession = { ...user, lastActivity: Date.now() };
-    window.localStorage.setItem('smartq-session', JSON.stringify(activeSession));
+    saveStoredSession(activeSession);
     setCurrentUser(activeSession);
   };
 
@@ -1582,14 +1631,14 @@ export default function App() {
     } catch {
       // Sesi lokal tetap dibersihkan saat server tidak dapat dijangkau.
     }
-    window.localStorage.removeItem('smartq-session');
+    clearStoredSession();
     setCurrentUser(null);
     setActiveQuizId('');
     navigateTo('home');
   };
 
   const clearExpiredSession = () => {
-    window.localStorage.removeItem('smartq-session');
+    clearStoredSession();
     setCurrentUser(null);
     setActiveQuizId('');
     setShowCreateModal(false);
@@ -1604,7 +1653,7 @@ export default function App() {
     let timeoutId;
     let lastRecordedActivity = 0;
 
-    const readSession = () => JSON.parse(window.localStorage.getItem('smartq-session') || 'null');
+    const readSession = () => getStoredSession();
 
     const expireSession = async () => {
       try {
@@ -1635,7 +1684,7 @@ export default function App() {
         return;
       }
 
-      window.localStorage.setItem('smartq-session', JSON.stringify({ ...session, lastActivity: now }));
+      saveStoredSession({ ...session, lastActivity: now });
       scheduleExpiry();
     };
 
