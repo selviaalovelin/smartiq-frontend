@@ -355,7 +355,7 @@ function ParticipantWaitingPage({ pin, participantName, onReady }) {
   useEffect(() => {
     const checkQuizStatus = async () => {
       try {
-        const payload = await requestJson(`/api/quizzes/pin/${pin}`);
+        const payload = await requestJson(`/api/quizzes/pin/${pin}`, { method: 'GET' });
         setMessage('');
         if (payload?.data?.status === 'started') {
           onReady();
@@ -1571,7 +1571,7 @@ export default function App() {
 
     const loadQuizzes = async () => {
       try {
-        const payload = await requestJson('/api/quizzes');
+        const payload = await requestJson('/api/quizzes', { method: 'GET' });
         const backendQuizzes = Array.isArray(payload?.data) ? payload.data : [];
 
         if (!isMounted) {
@@ -1603,7 +1603,7 @@ export default function App() {
 
     const loadAssignments = async () => {
       try {
-        const payload = await requestJson('/api/assignments');
+        const payload = await requestJson('/api/assignments', { method: 'GET' });
         if (isMounted) {
           setAssignments((payload.data || []).map(normalizeBackendAssignment));
         }
@@ -1769,7 +1769,7 @@ export default function App() {
     navigateTo('assignment-result');
 
     try {
-      const payload = await requestJson(`/api/assignments/${assignment.id}/participants`);
+      const payload = await requestJson(`/api/assignments/${assignment.id}/participants`, { method: 'GET' });
       setAssignmentResults(payload.data || []);
     } catch (error) {
       console.info('Hasil tugas belum dapat dimuat.', error);
@@ -1794,7 +1794,7 @@ export default function App() {
     navigateTo('assignment-result');
 
     try {
-      const payload = await requestJson(`/api/quizzes/${quiz.id}/participants`);
+      const payload = await requestJson(`/api/quizzes/${quiz.id}/participants`, { method: 'GET' });
       setAssignmentResults(payload.data || []);
     } catch (error) {
       console.info('Hasil live belum dapat dimuat.', error);
@@ -1895,7 +1895,7 @@ export default function App() {
 
   const handleJoinQuiz = async (pin) => {
     try {
-      const payload = await requestJson(`/api/quizzes/pin/${pin}`);
+      const payload = await requestJson(`/api/quizzes/pin/${pin}`, { method: 'GET' });
       const quiz = normalizeBackendQuiz(payload.data);
       setQuizzes((current) => [quiz, ...current.filter((item) => item.id !== quiz.id)]);
       setActiveQuizId(quiz.id);
@@ -1937,7 +1937,7 @@ export default function App() {
 
     let isMounted = true;
     const assignmentQuery = urlAssignmentId ? `?assignment_id=${encodeURIComponent(urlAssignmentId)}` : '';
-    requestJson(`/api/quizzes/pin/${urlPin}${assignmentQuery}`)
+    requestJson(`/api/quizzes/pin/${urlPin}${assignmentQuery}`, { method: 'GET' })
       .then((payload) => {
         if (!isMounted) {
           return;
@@ -2054,7 +2054,7 @@ export default function App() {
 
     const loadParticipants = async () => {
       try {
-        const payload = await requestJson(`/api/quizzes/${activeQuizId}/participants`);
+        const payload = await requestJson(`/api/quizzes/${activeQuizId}/participants`, { method: 'GET' });
         setLiveParticipants(payload.data || []);
       } catch (error) {
         console.info('Peserta live belum dapat dimuat.', error);
@@ -2071,7 +2071,7 @@ export default function App() {
       return;
     }
 
-    requestJson(`/api/quizzes/${activeQuizId}/leaderboard`)
+    requestJson(`/api/quizzes/${activeQuizId}/leaderboard`, { method: 'GET' })
       .then((payload) => setLeaderboard(payload.data || []))
       .catch((error) => console.info('Leaderboard belum dapat dimuat.', error));
   }, [page, activeQuizId]);
